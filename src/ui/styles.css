@@ -395,6 +395,17 @@ details summary { cursor: pointer; font-weight: 800; margin: 8px 0 4px; }
 .tut-bubble.low .tut-face { width: 36px; height: 36px; }
 .tut-bubble.low .tut-body p { font-size: 13px; margin-bottom: 4px; }
 
+/* Online play status */
+.net-pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .92); color: var(--plum); font: 800 12px var(--font); box-shadow: 0 3px 0 rgba(74, 53, 96, .18); pointer-events: auto; cursor: pointer; white-space: nowrap; }
+.net-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #b9b0c6; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .15); }
+.net-pill.online::before { background: #46c35a; }
+.net-pill.connecting::before { background: #ffc93c; animation: net-blink 1s ease-in-out infinite; }
+.net-pill.offline::before, .net-pill.incompatible::before { background: #ff6b5b; }
+.net-pill.inline { height: 24px; box-shadow: none; background: #f0e8fb; cursor: default; }
+.error-note { color: #b23a2c; background: #ffe9e5; border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; }
+@keyframes net-blink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .net-pill.connecting::before { animation: none; } }
+
 /* Notification type toggles (Settings) */
 .notify-types { margin: 2px 0 8px 26px; }
 .toggle.sub { font-size: 14px; }

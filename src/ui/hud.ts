@@ -20,6 +20,8 @@ import { DailyUi } from './dailyUi';
 import { chestReady } from '../sim/daily';
 import { sound } from '../audio/sound';
 import { GroveUi } from './groveUi';
+import type { GroveSource } from '../game/groveSource';
+import { Connection } from '../net/connection';
 import { attacksLeft, raidPhase } from '../sim/social/groveRaid';
 import { builderStatus, countOfType, hallLevel, limitFor, placeQuote, researchSkipQuote, researchStartQuote, skipQuote, topUpQuote, trainQuote, trainingSkipQuote, upgradeQuote, type QuoteResult } from '../sim/village';
 import { troopLevelOf } from '../sim/research';
@@ -48,6 +50,10 @@ export interface HudDeps {
   onRemindersEnabled(): Promise<void>;
   reminderNote: string;
   onReplayTutorial(): void;
+  /** Where the Grove screen gets its Grove: the bot Grove offline, a real one online. */
+  groveSource: GroveSource;
+  /** Online play (status 'off' when no server is configured). */
+  connection: Connection;
 }
 
 const RES_LABEL: Record<ResourceKind, string> = { acorns: 'Acorns', dew: 'Dew', nightsap: 'Nightsap', moonstones: 'Moonstones' };
@@ -74,6 +80,7 @@ export class Hud {
   private trophiesEl!: HTMLElement;
   private shieldEl!: HTMLElement;
   private shieldBox!: HTMLElement;
+  private netPill!: HTMLElement;
   private unlocksEl!: HTMLElement;
   private sheet!: HTMLElement;
   private placeBar!: HTMLElement;
@@ -112,12 +119,16 @@ export class Hud {
     });
     this.grove = new GroveUi({
       kit: { c: this.c, modal: (...a) => this.modal(...a), confirm: (...a) => this.confirm(...a), toast: (...a) => this.toast(...a), closeAllModals: () => this.closeAllModals() },
+      source: this.deps.groveSource,
       troopThumb: (t) => this.deps.troopThumb(t),
       onGroveAttack: (i) => this.deps.onGroveAttack(i),
     });
     this.daily = new DailyUi({ c: this.c, modal: (...a) => this.modal(...a), confirm: (...a) => this.confirm(...a), toast: (...a) => this.toast(...a), closeAllModals: () => this.closeAllModals() });
     this.buildSkeleton();
     this.c.subscribe(() => this.refresh());
+    this.deps.connection.subscribe(() => this.updateNet());
+    this.updateNet();
+    this.deps.groveSource.subscribe(() => this.refresh());
     this.c.onOffer((rule) => this.econ.showOffer(rule));
     this.bus.on('select', (id) => {
       this.selectedId = id;
@@ -164,6 +175,9 @@ export class Hud {
     this.shieldEl = h('span', { class: 'res-amt' });
     this.shieldBox = h('div', { class: 'res res-shield', title: 'Shield: no raids until it runs out' }, icon(icons.shield, 'res-icon'), h('div', { class: 'res-body' }, this.shieldEl));
     top.append(this.shieldBox);
+    this.netPill = h('button', { class: 'net-pill', type: 'button', title: 'Online play', onclick: () => this.openSettings(true) });
+    this.netPill.hidden = !this.deps.connection.enabled;
+    top.append(this.netPill);
 
     this.unlocksEl = h('button', { class: 'unlocks', type: 'button', onclick: () => this.openUnlocks() });
     this.eventChip = h('button', { class: 'event-chip', type: 'button', 'aria-label': 'Events', onclick: () => this.daily.openEvents() });
@@ -269,7 +283,107 @@ export class Hud {
     set('Pass', tiersReady + tasksReady);
     set('Goals', achievementViews(s, hl, gd).filter((v) => v.claimable).length);
     const live = raidPhase(this.c.now(), gd);
-    set('Grove', s.grove.joined ? (live.phase === 'live' ? attacksLeft(s, live.week, gd) : 0) + s.grove.requests.length : 1);
+    if (this.deps.groveSource.kind === 'online') {
+      const g = this.deps.groveSource.snapshot();
+      set('Grove', g.joined ? (g.raid.phase === 'live' ? g.raid.attacksLeft : 0) + g.requests.length : g.loading ? 0 : 1);
+    } else {
+      set('Grove', s.grove.joined ? (live.phase === 'live' ? attacksLeft(s, live.week, gd) : 0) + s.grove.requests.length : 1);
+    }
+  }
+
+  private static readonly NET_LABEL: Record<string, string> = { off: 'Offline play', connecting: 'Connecting…', online: 'Online', offline: 'No connection', incompatible: 'Update needed' };
+
+  private updateNet(): void {
+    const conn = this.deps.connection;
+    this.netPill.hidden = !conn.enabled;
+    this.netPill.className = `net-pill ${conn.status}`;
+    this.netPill.textContent = Hud.NET_LABEL[conn.status] ?? conn.status;
+    const queued = conn.enabled ? conn.outbox().length : 0;
+    if (queued) this.netPill.textContent += ` · ${queued} to send`;
+    if (conn.newDefenses > 0) {
+      const n = conn.newDefenses;
+      conn.newDefenses = 0;
+      this.toast(`${n} player${n > 1 ? 's' : ''} raided your village. See the battle log.`, 'info');
+    }
+  }
+
+  /** Settings section: server address, status, name and the leaderboard. */
+  private onlineSection(): HTMLElement {
+    const conn = this.deps.connection;
+    const wrap = h('div', { class: 'online-settings' });
+    const draw = () => {
+      clear(wrap);
+      const status = h('p', {}, h('span', { class: `net-pill inline ${conn.status}` }, Hud.NET_LABEL[conn.status] ?? conn.status), ' ', conn.enabled ? h('span', { class: 'muted small' }, conn.url) : '');
+      wrap.append(h('h3', {}, 'Online play'), status);
+      if (!conn.enabled) {
+        wrap.append(h('p', { class: 'muted' }, 'You are playing on your own: opponents, raiders and your Grove are friendly bots. Enter a Toadstool Kingdoms server address to raid real players and join real Groves.'));
+      } else {
+        wrap.append(h('p', { class: 'muted' }, 'Real players raid your village instead of bots, the opponents you scout are real villages (or wild ones when nobody fits), and your Grove is a real Grove. Your village itself still lives on this device.'));
+        if (conn.lastError && conn.status !== 'online') wrap.append(h('p', { class: 'note' }, conn.lastError));
+        if (conn.player) {
+          const name = h('input', { class: 'text', type: 'text', maxlength: 24, value: conn.player.name }) as HTMLInputElement;
+          name.addEventListener('keydown', (e) => e.stopPropagation());
+          const save = h('button', { class: 'btn ghost', type: 'button' }, 'Rename');
+          save.addEventListener('click', () => {
+            void conn.rename(name.value).then(
+              () => this.toast('Name saved.', 'success'),
+              (e: Error) => this.toast(e.message, 'error'),
+            );
+          });
+          wrap.append(h('label', { class: 'muted small' }, 'Your name in online play'), h('div', { class: 'chat-input-row' }, name, save));
+          const board = h('div', { class: 'events' }, 'Loading…');
+          const details = h('details', {}, h('summary', {}, 'Leaderboard'), board);
+          details.addEventListener('toggle', () => {
+            if (!details.open || !conn.port) return;
+            void conn.port.leaderboard(30).then(
+              (lb) => {
+                clear(board);
+                for (const p of lb.players) board.append(h('div', { class: `log-row${p.name === conn.player?.name ? ' current' : ''}` }, h('div', {}, h('b', {}, `${p.rank}. ${p.name}`), h('div', { class: 'muted small' }, `Elder Toadstool ${p.hallLevel}${p.grove ? ` · ${p.grove}` : ''}`)), h('span', { class: 'chip' }, icon(icons.leaf), String(p.trophies))));
+                if (lb.me) board.append(h('p', { class: 'muted small' }, `You are number ${lb.me.rank}.`));
+                if (!lb.players.length) board.append('Nobody is ranked yet.');
+              },
+              (e: Error) => {
+                board.textContent = e.message;
+              },
+            );
+          });
+          wrap.append(details);
+        }
+        const retry = h('button', { class: 'btn ghost', type: 'button' }, 'Connect now');
+        retry.addEventListener('click', () => void conn.sync().then(draw));
+        if (conn.status !== 'online') wrap.append(h('div', { class: 'actions' }, retry));
+      }
+      const chosen = Connection.chosen();
+      const addr = h('input', { class: 'text', type: 'url', inputmode: 'url', autocapitalize: 'off', spellcheck: 'false', placeholder: 'https://your-server.example.com', value: chosen && chosen !== 'off' ? chosen : '' }) as HTMLInputElement;
+      addr.addEventListener('keydown', (e) => e.stopPropagation());
+      const apply = (value: string) => {
+        Connection.choose(value);
+        this.toast('Restarting to switch servers…', 'info');
+        void this.c.save().then(() => window.setTimeout(() => location.reload(), 600));
+      };
+      wrap.append(
+        h('label', { class: 'muted small' }, 'Server address'),
+        h('div', { class: 'chat-input-row' }, addr, h('button', { class: 'btn ghost', type: 'button', onclick: () => apply(addr.value || '') }, 'Use')),
+        h(
+          'div',
+          { class: 'actions' },
+          conn.enabled ? h('button', { class: 'btn ghost', type: 'button', onclick: () => apply('off') }, 'Play offline') : null,
+          chosen ? h('button', { class: 'btn ghost', type: 'button', onclick: () => apply('') }, 'Use the built-in setting') : null,
+        ),
+        h('p', { class: 'muted small' }, 'Switching servers restarts the game. Your village stays on this device either way.'),
+      );
+    };
+    draw();
+    const unsub = conn.subscribe(draw);
+    // Stop listening once the Settings window is gone.
+    const obs = new MutationObserver(() => {
+      if (!wrap.isConnected) {
+        unsub();
+        obs.disconnect();
+      }
+    });
+    window.setTimeout(() => obs.observe(document.body, { childList: true, subtree: true }), 0);
+    return wrap;
   }
 
   private updateShield(): void {
@@ -890,8 +1004,10 @@ export class Hud {
 
   // ------------------------------------------------------------ settings
 
-  private openSettings(): void {
+  private openSettings(online = false): void {
     const body = h('div', { class: 'settings' });
+    const net = this.onlineSection();
+    if (online) body.append(net);
 
     // Save transfer
     const codeBox = h('textarea', { class: 'code', rows: 4, spellcheck: 'false', autocapitalize: 'off', placeholder: 'Paste a save code here to load a village from another device' }) as HTMLTextAreaElement;
@@ -907,6 +1023,7 @@ export class Hud {
       ),
     );
 
+    if (!online) body.append(net);
     body.append(this.econ.spendSection());
 
     // Display

@@ -1,4 +1,4 @@
-/** Server entry point. Env: PORT, DATABASE_URL (Postgres; memory if unset), CORS_ORIGIN. */
+/** Server entry point. Env: PORT, DATABASE_URL (Postgres; memory if unset), CORS_ORIGIN ('*' or a comma-separated list of origins). */
 import { defaultData } from '../src/sim/data';
 import { buildServer } from './app';
 import schema from './schema.sql?raw';

@@ -53,6 +53,7 @@
   "requestLifetimeHours": 8,
   "maxChat": 80,
   "requestCooldownMinutes": 30,
+  "chatPerMinute": 12,
   "reinforcementChunkMinutes": 2,
   "reinforcementChunkHousing": 5,
   "xpPerHousing": 2,

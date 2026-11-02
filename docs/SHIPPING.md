@@ -55,20 +55,41 @@ Apple only builds iPhone apps on a Mac. The **iOS TestFlight (manual)** workflow
 
 ## 3. Online play (real players instead of bots)
 
-The server in `server/` (Node + Fastify + Postgres) stores bases, matches attackers with real players, re-runs every battle on the server so results cannot be faked, and keeps defense history. Without it, the game uses generated opponents and bot raiders.
+The server in `server/` (Node + Fastify + Postgres) does five things:
+
+- matches you with real players, using the same rules as offline play (Elder Toadstool level, leaf rank, loot penalty and loot caps);
+- re-runs every battle, so results cannot be faked;
+- delivers real raids against your village;
+- runs real Groves (chat, troop requests and donations);
+- pairs Groves for the weekly Grove Raid.
+
+Without a server, the game uses generated opponents, bot raiders and a bot Grove, as before. Your village itself always stays on your device.
 
 1. Create a Postgres database. Render, Railway, Neon and Supabase all have free or cheap plans; copy its connection string.
 2. Deploy the server, for example on Render as a **Web Service** from this repository:
    - Build command: `npm ci && npm run server:build`
    - Start command: `npm run server:start`
    - Environment variables:
-     - `DATABASE_URL`: the connection string
-     - `CORS_ORIGIN`: `https://jimhavlicekpersonal.github.io`
-   - The tables are created automatically on first start.
-3. Check `https://<your-server>/healthz` returns `{"ok":true}`.
-4. In GitHub, go to **Settings → Secrets and variables → Actions → Variables** and add `VITE_SERVER_URL` = `https://<your-server>`. The next push to `main` rebuilds the web app and the Android APK with online play switched on.
+     - `DATABASE_URL`: the connection string.
+     - `CORS_ORIGIN`: leave it unset to allow every origin. This is safe, because players sign in with a token, not a cookie. To restrict it, use a comma-separated list: `https://jimhavlicekpersonal.github.io,capacitor://localhost,https://localhost`. The last two are the iPhone and Android apps.
+   - The tables are created on first start, and upgraded in place on later versions.
+   - Use the HTTPS address the host gives you. The phone apps refuse plain HTTP.
+3. Check that `https://<your-server>/v1/hello` shows `"name":"toadstool-kingdoms"`.
+4. Optional: check the server against the protocol contract. On Windows PowerShell, first set the address with `$env:CONTRACT_URL="https://<your-server>"`.
 
-To run it locally, use `npm run server:dev`. It uses memory instead of Postgres when `DATABASE_URL` is not set.
+   ```bash
+   CONTRACT_URL=https://<your-server> npm run test:contract
+   ```
+
+5. Turn online play on, in either or both of these ways:
+   - **For everyone:** in GitHub, go to **Settings → Secrets and variables → Actions → Variables** and add `VITE_SERVER_URL` = `https://<your-server>`. The next push to `main` rebuilds the web app and the Android APK with that server built in.
+   - **On one device, no rebuild:** in the game, open **Settings → Online play**, type the server address and tap **Use**. **Play offline** switches back. This is handy for testing a new server before building it in.
+
+The top bar shows the connection: **Online**, **Connecting…** or **No connection**. Battles you fight while the connection is down are sent when it comes back.
+
+**Running a server locally:** run `npm run server:dev`. It uses memory instead of Postgres when `DATABASE_URL` is not set. In the game, set the server address to `http://localhost:8787`, or to `http://<laptop-ip>:8787` from a phone on the same Wi-Fi, using `npm run dev:lan`.
+
+**Building a different server later:** `docs/PROTOCOL.md` describes everything the game expects. The contract tests check any server against it.
 
 ## 4. Reminders
 
@@ -77,4 +98,4 @@ The installed iOS/Android app schedules real local notifications when you leave 
 ## 5. Not done yet (decisions for later)
 
 - **Google Play Billing** for the Android app. The `PaymentProvider` interface is ready for a Play Billing provider; purchases are disabled in the Android build until then. Publishing on Google Play also needs a Google Play Console account ($25 one-time).
-- **Cloud saves across devices.** The server handles PvP. Your village itself is still saved per device; use Settings → Copy save code / Load from code to move it.
+- **Cloud saves across devices.** The server handles PvP, Groves and Grove Raids. Your village itself is still saved per device; use Settings → Copy save code / Load from code to move it. Moving the village economy to the server would also stop players from editing their own saves (see "Trust" in `docs/PROTOCOL.md`).

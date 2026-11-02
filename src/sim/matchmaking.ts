@@ -141,11 +141,26 @@ export function strengthFloor(state: VillageState, data: GameData): number | und
 
 /** The generated opponent behind a scout seed, for this player. */
 export function opponentFor(seed: number, state: VillageState, data: GameData): BaseLayout {
-  const own = hallLevel(state, data);
-  const st = matchStrength(createRng(mixSeed(seed, 0x5c0a7)), state.trophies, own, data, false, strengthFloor(state, data));
+  return opponentForRank(seed, state.trophies, hallLevel(state, data), data, strengthFloor(state, data));
+}
+
+/**
+ * The same generated opponent from just a rank and hall level (plus the
+ * army-strength floor when the caller knows it). The server uses this when no
+ * real player fits, so online and offline matchmaking agree.
+ */
+export function opponentForRank(seed: number, trophies: number, ownHall: number, data: GameData, floor?: number): BaseLayout {
+  const st = matchStrength(createRng(mixSeed(seed, 0x5c0a7)), trophies, ownHall, data, false, floor);
   const base = generateOpponent(seed, st.hall, data, { levelBias: st.bias });
   base.trophies = st.trophies;
-  return applyLootPenalty(base, own, data);
+  return applyLootPenalty(base, ownHall, data);
+}
+
+/** The Elder Toadstool levels a player at `ownHall` may be matched against. */
+export function hallWindow(ownHall: number, data: GameData): { min: number; max: number } {
+  const mm = data.ranks.matchmaking;
+  // hallsBelow can be fractional (strength units): a half level below still reaches that hall.
+  return { min: Math.max(1, ownHall - Math.ceil(mm.hallsBelow)), max: Math.min(maxHall(data), ownHall + mm.hallsAbove) };
 }
 
 export interface BotAttacker {

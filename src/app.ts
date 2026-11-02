@@ -1,15 +1,15 @@
 import type Phaser from 'phaser';
 import { BattleSession } from './game/battleSession';
 import type { GameController } from './game/controller';
+import type { GroveSource, RaidBattle } from './game/groveSource';
+import type { Connection } from './net/connection';
 import type { BattleSceneInit } from './render/BattleScene';
 import type { BaseLayout, BattleRecord, BattleSetup } from './sim/battle/types';
-import { applyLootPenalty, opponentFor } from './sim/matchmaking';
+import { opponentFor } from './sim/matchmaking';
 import { troopLevels } from './sim/research';
 import { mixSeed } from './sim/rng';
-import { battleArmy, hallLevel, scoutFee } from './sim/village';
-import { enemyGrove, raidPhase } from './sim/social/groveRaid';
+import { battleArmy, scoutFee } from './sim/village';
 import { BattleHud } from './ui/battleHud';
-import type { OnlineClient } from './online/client';
 import { sound } from './audio/sound';
 import type { Hud } from './ui/hud';
 
@@ -21,9 +21,13 @@ export interface AppDeps {
   battleRoot: HTMLElement;
   renderScale: number;
   troopThumb(type: string): string | null;
-  /** Optional PvP server: real opponents instead of generated ones. */
-  online?: OnlineClient | null;
+  /** Online play: real opponents and real Grove Raids when connected. */
+  connection: Connection;
+  groveSource: GroveSource;
 }
+
+/** Leave this much of a ticket's lifetime for the 3-minute battle itself. */
+const TICKET_MARGIN_MS = 5 * 60_000;
 
 /** Switches between the village and battles (scouting, live attacks, replays). */
 export class App {
@@ -38,7 +42,7 @@ export class App {
 
   private ticket: string | null = null;
   /** The online opponent behind the current scout seed, kept so Home + Attack shows the same base. */
-  private onlineMatch: { seed: number; ticket: string; base: BaseLayout; at: number } | null = null;
+  private onlineMatch: { seed: number; ticket: string; base: BaseLayout; expiresAt: number } | null = null;
 
   /** Look for an opponent. `paid` = pressing Next. */
   async scout(paid = false): Promise<void> {
@@ -52,18 +56,20 @@ export class App {
     this.ticket = null;
     const army = battleArmy(c.state);
     const levels = troopLevels(c.state, c.data);
-    // A real player's base from the server when online; a generated one otherwise.
-    if (this.d.online) {
+    const conn = this.d.connection;
+    // Online: the server picks the opponent (a real village, or a generated
+    // one when nobody fits) with the same matchmaking rules, and has already
+    // applied the loot penalty to it.
+    if (conn.online && conn.port) {
       try {
         // Same scout seed as last time (Home, then Attack): show the same base
-        // while its ticket is still fresh, so leaving never rerolls for free.
-        const kept = this.onlineMatch && this.onlineMatch.seed === r.seed && c.now() - this.onlineMatch.at < 9 * 60_000 ? this.onlineMatch : null;
-        const m = kept ?? (await this.d.online.match());
+        // while its ticket is still valid, so leaving never rerolls for free.
+        const kept = this.onlineMatch && this.onlineMatch.seed === r.seed && Date.now() < this.onlineMatch.expiresAt - TICKET_MARGIN_MS ? this.onlineMatch : null;
+        const m = kept ?? (await conn.port.match());
         if (m) {
-          const base = kept ? kept.base : applyLootPenalty(m.base, hallLevel(c.state, c.data), c.data);
-          this.onlineMatch = { seed: r.seed, ticket: m.ticket, base, at: kept ? kept.at : c.now() };
-          this.ticket = m.ticket;
-          const setup: BattleSetup = { seed: mixSeed(r.seed, 0xba771e), base: structuredClone(base), army, levels };
+          this.onlineMatch = kept ?? { seed: r.seed, ticket: m.ticket, base: m.base, expiresAt: m.expiresAt };
+          this.ticket = this.onlineMatch.ticket;
+          const setup: BattleSetup = { seed: mixSeed(r.seed, 0xba771e), base: structuredClone(this.onlineMatch.base), army, levels };
           this.open(new BattleSession(setup, c.data, 'scout'));
           return;
         }
@@ -78,16 +84,13 @@ export class App {
   }
 
   /** Attack an enemy base in the Grove Raid (no loot or trophies). */
-  groveAttack(target: number): void {
-    const c = this.d.controller;
-    const p = raidPhase(c.now(), c.data);
-    if (p.phase !== 'live') return;
-    const enemy = enemyGrove(c.state.grove.seed, p.week, hallLevel(c.state, c.data), c.data);
-    const base = enemy.bases[target];
-    if (!base) return;
-    const done = c.state.grove.raid?.week === p.week ? c.state.grove.raid.attacks.length : 0;
-    const setup: BattleSetup = { seed: mixSeed(c.state.grove.seed, p.week * 1000 + target + done * 97 + 1), base, army: battleArmy(c.state), levels: troopLevels(c.state, c.data) };
-    this.open(new BattleSession(setup, c.data, 'scout'), undefined, { target, enemyName: enemy.name });
+  async groveAttack(target: number): Promise<void> {
+    const battle = await this.d.groveSource.raidBattle(target);
+    if ('error' in battle) {
+      this.d.hud.toast(battle.error, 'error');
+      return;
+    }
+    this.open(new BattleSession(battle.setup, this.d.controller.data, 'scout'), undefined, battle);
   }
 
   replay(record: BattleRecord): void {
@@ -105,7 +108,7 @@ export class App {
     sound.music('village');
   }
 
-  private open(session: BattleSession, replayOf?: BattleRecord, grove?: { target: number; enemyName: string }): void {
+  private open(session: BattleSession, replayOf?: BattleRecord, grove?: RaidBattle): void {
     const c = this.d.controller;
     this.battleHud?.destroy();
     this.session = session;
@@ -124,22 +127,19 @@ export class App {
       onAttack: () => session.start(),
       onFinished: () => {
         if (grove) {
-          const g = c.finishGroveBattle(grove.target, session.setup, session.deployments, session.endTick, session.setup.base.name);
+          const g = grove.finish(session.deployments, session.endTick);
           if (!g) return null;
           return { result: session.result(), banked: {}, trophies: 0 };
         }
         const out = c.finishBattle(session.setup, session.deployments, session.endTick, session.setup.base.name);
         if (!out) return null;
-        if (this.d.online && this.ticket) {
+        if (this.ticket) {
+          // The server re-runs the battle from seed + deployments; the outbox
+          // keeps the report until it gets through.
           const ticket = this.ticket;
           this.ticket = null;
           this.onlineMatch = null;
-          const online = this.d.online;
-          void online
-            .submitAttack({ ticket, seed: session.setup.seed, army: session.setup.army, levels: session.setup.levels, deployments: session.deployments, endTick: session.endTick })
-            .then(() => online.me())
-            .then((me) => c.dispatch({ type: 'syncRank', trophies: me.trophies, shieldUntil: me.shieldUntil }))
-            .catch((e) => console.warn('Could not report the attack to the server', e));
+          void this.d.connection.report('attack', { ticket, seed: session.setup.seed, army: session.setup.army, levels: session.setup.levels, deployments: session.deployments, endTick: session.endTick });
         }
         lastRecord = out.record;
         return { result: out.record.result, banked: out.banked, trophies: out.record.trophies ?? 0, bonus: out.record.leagueBonus, eventBonus: out.record.eventBonus };

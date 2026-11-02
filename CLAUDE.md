@@ -25,13 +25,34 @@ How this is met:
 ## Decisions made during Phases 2-6
 
 - Art direction (owner request): smoother, softer, Nintendo-like look. All art is still generated in code (`src/render/art/`).
-- Save format is versioned (`src/sim/save.ts`, currently v9) with a migration step per version. Bump `SAVE_VERSION` and add a step for every state change. (v7 and v9 dropped stored replays because battle rules changed; v8 added the daily chest and streak.)
+- Save format is versioned (`src/sim/save.ts`, currently v10) with a migration step per version. Bump `SAVE_VERSION` and add a step for every state change. (v7 and v10 dropped stored replays because battle rules changed; v8 added the daily chest and streak; v9 added `net`, the online bookkeeping.)
 - Progression pacing is checked by a model-player test (`tests/balance/`) that fights every raid as a real battle through matchmaking and `battleEnd` (no assumed loot share). Rerun it after changing costs, times, loot or combat numbers. `tests/balance/combat.test.ts` and `curves.test.ts` pin the attack/defense balance and the curve shapes.
 - Offers have a `minAccountHours` field so brand-new players are not shown the builder offer in their first minutes.
 - Real prices appear only in the Store and its confirm step (pass and offer popups link to the Store).
 - Phase 6: Capacitor 8 (iOS + Android). iOS purchases use a local StoreKit 2 plugin (`ios/App/App/TkStorePlugin.swift`, registered in `TkViewController.swift`). **Android purchases are disabled** (`UnavailablePaymentProvider`) until Google Play Billing is added; ask the owner before adding it.
-- PvP server: Fastify 5 + `pg`, bundled with Vite (`vite.server.config.ts`). Online play turns on when the build has `VITE_SERVER_URL`; with it, real raids replace bot raids. The village economy stays on the device.
+- PvP server: Fastify 5 + `pg`, bundled with Vite (`vite.server.config.ts`). Online play turns on when the build has `VITE_SERVER_URL`, or when a server address is entered in Settings → Online play (stored in localStorage under `tk.net.server`; the value `off` forces offline). With a server, real raids replace bot raids and a real Grove replaces the bot Grove. The village economy stays on the device.
 - The owner-only steps (Apple account, App Store Connect products, secrets, server hosting) are in `docs/SHIPPING.md`.
+
+## Multiplayer (ports and adapters)
+
+Everything multiplayer follows the game-theory rules above. The protocol is described in `docs/PROTOCOL.md`.
+
+- **Protocol:** `src/net/protocol.ts` holds the routes, request and response types, error codes and `PROTOCOL_VERSION` (currently 2). Bump the version for any change that would break older clients, and update `docs/PROTOCOL.md` and the contract tests with it.
+- **Client ports:**
+  - `src/net/ports.ts` defines `ServerPort`. Adapters: `HttpServerAdapter` (`src/net/httpAdapter.ts`) and `InProcessServerAdapter` (`server/inProcess.ts`, for tests).
+  - `src/net/connection.ts` is the connection manager. It handles status, registration and base upload. Server results enter the village only through idempotent commands (`applyDefense`, `receiveDonations`, `claimRaidChest`, `spendDonation`, `remoteGroveBattleEnd`, `leaveLocalGrove`), deduplicated by `state.net` (save v9). Battle reports go through a persisted outbox.
+- **Grove screen:** `src/game/groveSource.ts` defines `GroveSource`, with `LocalGroveSource` (bot Grove) and `RemoteGroveSource` (server). `GroveUi` renders only the snapshot.
+- **Server:**
+  - `server/core/` holds every rule and knows nothing about HTTP or databases. It sees the outside world through `ServerContext` (`server/core/context.ts`) and the `Repo` storage port (`server/repo.ts`, adapters `MemoryRepo` and `PgRepo`).
+  - `server/app.ts` is a thin Fastify adapter. `server/schema.sql` is idempotent and upgrades older databases in place.
+  - Online, the server applies the loot penalty in the match ticket. The client must not apply it again.
+- **Grove Raid rules:**
+  - Only members who joined before the raid started take part.
+  - A claim is allowed once per player per week. `RaidView.chests` tells the client which weeks to claim.
+- **Tests:**
+  - `tests/server/core.test.ts` and `tests/server/repo.test.ts` run on memory, and also on Postgres when `TEST_DATABASE_URL` is set. CI does this with a Postgres service.
+  - `tests/contract/` checks any server URL: `CONTRACT_URL=… npm run test:contract`. Without the variable it starts our server.
+  - `tests/net/` and `tests/game/groveSource.test.ts` cover the client side.
 
 ## Balance pass (20 fixes)
 

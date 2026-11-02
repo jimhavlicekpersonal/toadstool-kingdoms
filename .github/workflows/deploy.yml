@@ -36,9 +36,44 @@ jobs:
         with:
           path: dist
 
+  # The multiplayer server on real Postgres: storage contract, server rules,
+  # and the protocol contract against the production bundle.
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tk_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/tk_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck:server
+      - run: npx vitest run tests/server tests/net tests/contract
+      - run: npm run server:build
+      - name: Protocol contract against the built server on Postgres
+        run: |
+          DATABASE_URL=$TEST_DATABASE_URL PORT=8787 node dist-server/main.js > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8787/healthz && break; sleep 1; done
+          CONTRACT_URL=http://localhost:8787 npm run test:contract || (cat server.log; exit 1)
+
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
+    needs: [build, server]
     runs-on: ubuntu-latest
     permissions:
       pages: write

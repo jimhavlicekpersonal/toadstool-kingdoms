@@ -23,10 +23,11 @@ it('a Phase 1 (v1) save loads in the latest version', () => {
     },
   };
   const village = deserialize(JSON.parse(JSON.stringify(v1)), data);
-  expect(SAVE_VERSION).toBe(9);
+  expect(SAVE_VERSION).toBe(10);
   expect(village.daily.lastDay).toBe(-1);
   expect(village.research).toEqual({ levels: {}, active: null });
   expect(village.scout).toBeNull();
+  expect(village.net).toEqual({ playerId: null, defensesSince: 0, donations: [], raidWeeks: [] });
   expect(village.stats.upgradesDone).toBe(0);
   expect(village.buildings.filter((b) => !b.type.startsWith('obstacle_'))).toHaveLength(5);
   expect(village.tutorial.done).toBe(true); // existing players skip the tutorial

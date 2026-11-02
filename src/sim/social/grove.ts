@@ -108,7 +108,7 @@ function giftTroop(rng: ReturnType<typeof createRng>, state: VillageState, data:
 }
 
 /** Add donated troops to the player's reinforcements, up to Lodge capacity. Returns housing added. */
-function addReinforcements(state: VillageState, troop: string, housing: number, data: GameData): number {
+export function addReinforcements(state: VillageState, troop: string, housing: number, data: GameData): number {
   const def = data.troops[troop];
   if (!def) return 0;
   const room = reinforcementCapacity(state, data) - reinforcementHousing(state, data);

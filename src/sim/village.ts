@@ -17,6 +17,7 @@ import { buildTimeFactor, currentTasks, dayIndex, passSeason, rollPeriods, unloc
 import { emptyStats, type OfferTrigger } from './types';
 import { advanceGrove, canRequest, donate as donateTroops, emptyGrove, joinGrove, requestTroops, sendChat } from './social/grove';
 import { attacksLeft, ensureRaid, raidPhase, settleRaids } from './social/groveRaid';
+import { bindPlayer, claimRaidChest, emptyNet, receiveDonations, spendDonation, type ServerDonation } from './net';
 import { canPlace } from './grid';
 import { addCapped, canAfford, capacity, collectorAmount, effectiveLevel, subtractCost } from './resources';
 import type { Building, BuildingLimit, BuildingType, Cost, GameData, ResourceKind, VillageState } from './types';
@@ -58,7 +59,14 @@ export type Command =
   | { type: 'markPrepOffer'; week: number }
   | { type: 'tutorial'; step: number; done?: boolean }
   | { type: 'applyDefense'; record: BattleRecord; lost: Cost; trophies: number; shieldUntil: number }
-  | { type: 'syncRank'; trophies: number; shieldUntil?: number };
+  | { type: 'syncRank'; trophies: number; shieldUntil?: number }
+  // Multiplayer server results (see sim/net.ts); each is safe to apply twice.
+  | { type: 'netBind'; playerId: string }
+  | { type: 'receiveDonations'; items: ServerDonation[] }
+  | { type: 'spendDonation'; troop: string; count: number; xp: number }
+  | { type: 'claimRaidChest'; week: number; outcome: 'win' | 'draw' | 'loss'; ours: number; theirs: number }
+  | { type: 'remoteGroveBattleEnd'; target: number; record: Omit<BattleRecord, 'result' | 'id' | 'kind'> }
+  | { type: 'leaveLocalGrove' };
 
 export type ErrorCode =
   | 'NOT_FOUND'
@@ -104,7 +112,8 @@ export type SimEvent =
   | { kind: 'reward'; source: string; grants: Cost }
   | { kind: 'clear_start'; buildingType: BuildingType; id: string; seconds: number }
   | { kind: 'donation'; troop: string; count: number; xp: number }
-  | { kind: 'grove_attack'; target: number; stars: number; destruction: number };
+  | { kind: 'grove_attack'; target: number; stars: number; destruction: number }
+  | { kind: 'reinforcements'; troops: { troop: string; count: number; fromName: string }[] };
 
 export type CommandResult =
   | { ok: true; state: VillageState; events: SimEvent[] }
@@ -160,6 +169,7 @@ export function createNewVillage(now: number, data: GameData): VillageState {
     achievements: {},
     flags: { longWaitSeen: false },
     grove: emptyGrove(),
+    net: emptyNet(),
     tutorial: { step: 0, done: false },
     daily: emptyDaily(data),
   };
@@ -440,8 +450,39 @@ function runCommand(s: VillageState, cmd: Command, now: number, data: GameData):
       s.shieldUntil = Math.max(s.shieldUntil, cmd.shieldUntil);
       s.defenseLog.push(cmd.record);
       while (s.defenseLog.length > data.raids.maxDefenseLog) s.defenseLog.shift();
+      s.net.defensesSince = Math.max(s.net.defensesSince, cmd.record.at);
       return { ok: true, state: s, events: [] };
     }
+    case 'netBind':
+      bindPlayer(s, cmd.playerId);
+      return { ok: true, state: s, events: [] };
+    case 'receiveDonations': {
+      const troops = receiveDonations(s, cmd.items, data);
+      return { ok: true, state: s, events: troops.length ? [{ kind: 'reinforcements', troops }] : [] };
+    }
+    case 'spendDonation':
+      if (!spendDonation(s, cmd.troop, cmd.count, cmd.xp)) return fail('NOT_AVAILABLE', 'Not enough of that troop.');
+      return { ok: true, state: s, events: [{ kind: 'donation', troop: cmd.troop, count: cmd.count, xp: cmd.xp }] };
+    case 'claimRaidChest': {
+      const chest = claimRaidChest(s, cmd.week, cmd.outcome, cmd, hallLevel(s, data), data);
+      if (!chest) return fail('ALREADY_CLAIMED', 'That chest was already collected.');
+      return { ok: true, state: s, events: [{ kind: 'reward', source: `grove_raid:${cmd.week}`, grants: chest }] };
+    }
+    case 'remoteGroveBattleEnd': {
+      // A Grove Raid attack scored by the server: only the troops are spent here.
+      const bad = checkBattleSetup(s, cmd.record.setup, data);
+      if (bad) return fail('INVALID_BATTLE', bad);
+      const { result } = runBattle(cmd.record.setup, cmd.record.deployments, data, cmd.record.endTick);
+      spendTroops(s, result.used);
+      return { ok: true, state: s, events: [{ kind: 'grove_attack', target: cmd.target, stars: result.stars, destruction: result.destruction }] };
+    }
+    case 'leaveLocalGrove':
+      // Playing online: the real Grove replaces the bot one (XP, Lodge troops and history stay).
+      s.grove.joined = false;
+      s.grove.requests = [];
+      s.grove.myRequest = null;
+      s.grove.raid = null;
+      return { ok: true, state: s, events: [] };
     case 'syncRank':
       s.trophies = Math.max(0, cmd.trophies);
       if (cmd.shieldUntil !== undefined) s.shieldUntil = cmd.shieldUntil;

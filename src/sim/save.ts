@@ -8,10 +8,11 @@ import { emptyGrove } from './social/grove';
 import { seasonOf } from './ranks';
 import { emptyStats } from './types';
 import { emptyResearch } from './research';
+import { emptyNet } from './net';
 import { emptyDaily } from './daily';
 import type { GameData as GD } from './types';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 const EXPORT_PREFIX = 'TK1';
 
 export interface SaveFile {
@@ -92,7 +93,12 @@ export function migrate(raw: unknown, data?: GD): SaveFile {
     v.daily = v.daily ?? (data ? emptyDaily(data) : { lastDay: -1, step: 0, skipsLeft: 1, skipWeek: -1, history: [] });
   }
   if (out.version < 9 && v && typeof v === 'object') {
-    // v8 -> v9: guardian animals, the drop zone outside hedge rings and the
+    // v8 -> v9: online bookkeeping (real raids, donations and Grove Raid chests from a server).
+    v.net = v.net ?? emptyNet();
+    v.daily = v.daily ?? (data ? emptyDaily(data) : { lastDay: -1, step: 0, skipsLeft: 1, skipWeek: -1, history: [] });
+  }
+  if (out.version < 10 && v && typeof v === 'object') {
+    // v9 -> v10: guardian animals, the drop zone outside hedge rings and the
     // rebuilt levels change how battles play, so old replays would not play
     // back the same way: drop them. The kept scout opponent is re-rolled too.
     v.battleLog = [];

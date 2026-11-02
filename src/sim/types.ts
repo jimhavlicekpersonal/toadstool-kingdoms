@@ -94,6 +94,8 @@ export interface VillageState {
   achievements: Record<string, number>;
   flags: { longWaitSeen: boolean };
   grove: GroveState;
+  /** What a multiplayer server has already given this village (see sim/net.ts). */
+  net: NetState;
   /** Guided first steps for new players. */
   tutorial: { step: number; done: boolean };
   /** Free daily chest and visit streak. */
@@ -110,6 +112,17 @@ export interface DailyState {
   skipWeek: number;
   /** Recent chests, newest last. */
   history: { day: number; outcome: string; step: number; grants: Cost }[];
+}
+
+export interface NetState {
+  /** Server account these markers belong to (reset when it changes). */
+  playerId: string | null;
+  /** Real raids from the server applied up to this time. */
+  defensesSince: number;
+  /** Server donation ids already added to the Grove Lodge. */
+  donations: string[];
+  /** Server Grove Raid weeks whose chest was collected. */
+  raidWeeks: number[];
 }
 
 export interface ChatMessage {
@@ -481,6 +494,8 @@ export interface SocialDef {
   requestLifetimeHours: number;
   maxChat: number;
   requestCooldownMinutes: number;
+  /** Chat messages one player may post per minute on the server. */
+  chatPerMinute: number;
   reinforcementChunkMinutes: number;
   reinforcementChunkHousing: number;
   xpPerHousing: number;
