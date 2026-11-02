@@ -72,9 +72,10 @@
   "matchmaking": {
     "trophiesPerHall": 350,
     "strengthJitter": 0.35,
-    "hallsBelow": 1,
+    "hallsBelow": 1.5,
     "hallsAbove": 1,
-    "trophyJitter": 30
+    "trophyJitter": 30,
+    "readinessFloor": true
   },
   "lootPenaltyByHallDiff": [
     1,

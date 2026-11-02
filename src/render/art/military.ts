@@ -446,7 +446,57 @@ const groveLodge: PainterDef = {
   },
 };
 
+// ---------------------------------------------------------------- Guardian Burrow
+const guardianBurrow: PainterDef = {
+  extra: 70,
+  paint(ctx, size) {
+    plate(ctx, size, '#cfe3a8');
+    softShadow(ctx, 58, 24, 6, 0.3);
+    // Grassy mound
+    blob(ctx, { x: -56, y: -62, w: 112, h: 74 }, '#7fc65a', () => {
+      ctx.moveTo(-56, 6);
+      ctx.bezierCurveTo(-54, -52, 54, -52, 56, 6);
+      ctx.quadraticCurveTo(0, 18, -56, 6);
+      ctx.closePath();
+    }, { light: 0.35, line: 1.6 });
+    // Burrow mouth with a little wooden arch
+    blob(ctx, { x: -24, y: -34, w: 48, h: 38 }, '#3a2350', () => {
+      ctx.moveTo(-22, 4);
+      ctx.bezierCurveTo(-22, -34, 22, -34, 22, 4);
+      ctx.closePath();
+    }, { line: 1.2 });
+    ctx.beginPath();
+    ctx.moveTo(-26, 4);
+    ctx.bezierCurveTo(-26, -40, 26, -40, 26, 4);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = WOOD;
+    ctx.stroke();
+    // Two eyes peeking out of the dark
+    for (const x of [-7, 7]) {
+      ctx.beginPath();
+      ellipsePath(ctx, x, -12, 3, 3.4);
+      ctx.fillStyle = '#fff6c8';
+      ctx.fill();
+    }
+    // Banner on a pole
+    ctx.beginPath();
+    ctx.moveTo(34, -20);
+    ctx.lineTo(34, -78);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = WOOD;
+    ctx.stroke();
+    blob(ctx, { x: 34, y: -78, w: 26, h: 20 }, '#ff6b5b', () => {
+      ctx.moveTo(35, -78);
+      ctx.lineTo(60, -72);
+      ctx.lineTo(35, -60);
+      ctx.closePath();
+    }, { line: 1.2 });
+    blob(ctx, { x: -48, y: -30, w: 14, h: 12 }, '#ffd23f', () => ellipsePath(ctx, -41, -24, 6, 5), { line: 1 });
+  },
+};
+
 export const militaryPainters: Record<string, PainterDef> = {
+  guardian_burrow: guardianBurrow,
   grove_lodge: groveLodge,
   thorn_snare: thornSnare,
   sap_puddle: sapPuddle,
@@ -656,6 +706,82 @@ export const troopArt: Record<string, TroopArt> = {
   },
 };
 
+// ---------------------------------------------------------------- Guardian animals (defend opponent bases)
+
+troopArt.badger_warden = {
+  w: 50,
+  h: 42,
+  paint(ctx) {
+    softShadow(ctx, 18, 6, 0, 0.32);
+    blob(ctx, { x: -20, y: -30, w: 40, h: 30 }, '#6d6a80', () => ctx.ellipse(0, -14, 20, 15, 0, 0, Math.PI * 2), { light: 0.35, dark: 0.3, line: 1.5 });
+    // White stripe and face
+    blob(ctx, { x: 4, y: -30, w: 22, h: 22 }, '#f4f1ff', () => ctx.ellipse(15, -19, 11, 10, 0, 0, Math.PI * 2), { line: 1.2 });
+    blob(ctx, { x: 9, y: -30, w: 12, h: 18 }, '#3a3550', () => roundRectPath(ctx, 12, -30, 6, 16, 3), { line: 0.6 });
+    blob(ctx, { x: 22, y: -18, w: 6, h: 5 }, '#3a2350', () => ellipsePath(ctx, 25, -15, 2.6, 2.2), { line: 0.6 });
+    face(ctx, 15, -16, 0.42, { mood: 'determined', blush: false });
+    // Little guard helmet
+    blob(ctx, { x: 5, y: -38, w: 20, h: 10 }, '#ffcf52', () => {
+      ctx.moveTo(5, -30);
+      ctx.bezierCurveTo(5, -40, 25, -40, 25, -30);
+      ctx.closePath();
+    }, { line: 1 });
+    for (const x of [-12, 4]) blob(ctx, { x: x - 4, y: -5, w: 8, h: 6 }, '#4f4b63', () => ellipsePath(ctx, x, -2, 4, 3), { line: 0.8 });
+  },
+};
+
+troopArt.stoat_skirmisher = {
+  w: 44,
+  h: 34,
+  paint(ctx) {
+    softShadow(ctx, 15, 5, 0, 0.3);
+    // Long body and black-tipped tail
+    blob(ctx, { x: -20, y: -18, w: 32, h: 14 }, '#d9884a', () => ctx.ellipse(-4, -11, 16, 7, -0.1, 0, Math.PI * 2), { light: 0.4, line: 1.2 });
+    ctx.beginPath();
+    ctx.moveTo(-18, -12);
+    ctx.quadraticCurveTo(-28, -20, -24, -28);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#d9884a';
+    ctx.stroke();
+    blob(ctx, { x: -28, y: -32, w: 8, h: 8 }, '#2b1838', () => ellipsePath(ctx, -24, -28, 3.5, 3.5), { line: 0.6 });
+    blob(ctx, { x: 4, y: -26, w: 18, h: 16 }, '#d9884a', () => ctx.ellipse(13, -18, 9, 8, 0, 0, Math.PI * 2), { line: 1.2 });
+    blob(ctx, { x: 8, y: -20, w: 12, h: 9 }, '#fff3e0', () => ctx.ellipse(14, -15, 6, 4, 0, 0, Math.PI * 2), { line: 0.6 });
+    for (const x of [8, 17]) blob(ctx, { x: x - 3, y: -30, w: 6, h: 6 }, '#d9884a', () => ellipsePath(ctx, x, -26, 2.8, 3), { line: 0.8 });
+    face(ctx, 13, -19, 0.36, { mood: 'grin', blush: true });
+  },
+};
+
+troopArt.hawk_sentinel = {
+  w: 62,
+  h: 56,
+  paint(ctx) {
+    // Drawn flying; the scene draws its shadow on the ground.
+    for (const d of [-1, 1]) {
+      blob(ctx, { x: d < 0 ? -32 : 6, y: -46, w: 26, h: 16 }, '#9a6a3e', () => {
+        ctx.moveTo(d * 4, -36);
+        ctx.quadraticCurveTo(d * 18, -50, d * 30, -40);
+        ctx.quadraticCurveTo(d * 18, -36, d * 4, -30);
+        ctx.closePath();
+      }, { line: 1.2 });
+    }
+    blob(ctx, { x: -12, y: -50, w: 24, h: 30 }, '#b07a48', () => ctx.ellipse(0, -35, 12, 15, 0, 0, Math.PI * 2), { light: 0.4, line: 1.3 });
+    blob(ctx, { x: -8, y: -38, w: 16, h: 16 }, '#f7e7cf', () => ctx.ellipse(0, -29, 8, 8, 0, 0, Math.PI * 2), { line: 0.8 });
+    face(ctx, 0, -41, 0.5, { mood: 'determined', blush: false });
+    blob(ctx, { x: -3, y: -40, w: 6, h: 6 }, '#ffb340', () => {
+      ctx.moveTo(-3, -38);
+      ctx.lineTo(3, -38);
+      ctx.lineTo(0, -33);
+      ctx.closePath();
+    }, { line: 0.7 });
+    // Red guard sash
+    ctx.beginPath();
+    ctx.moveTo(-10, -32);
+    ctx.lineTo(10, -24);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ff6b5b';
+    ctx.stroke();
+  },
+};
+
 // ---------------------------------------------------------------- Projectiles and effects
 
 export const projectileArt: Record<string, { w: number; h: number; paint: (ctx: Ctx) => void }> = {
@@ -686,6 +812,19 @@ export const projectileArt: Record<string, { w: number; h: number; paint: (ctx: 
       ctx.beginPath();
       ctx.arc(0, 0, 9, 0, Math.PI * 2);
       ctx.fill();
+    },
+  },
+  feather: {
+    w: 16,
+    h: 8,
+    paint(ctx) {
+      blob(ctx, { x: -7, y: -3, w: 14, h: 6 }, '#f7e7cf', () => ctx.ellipse(0, 0, 7, 2.6, 0.2, 0, Math.PI * 2), { line: 0.8 });
+      ctx.beginPath();
+      ctx.moveTo(-7, 0);
+      ctx.lineTo(7, 0);
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = '#9a6a3e';
+      ctx.stroke();
     },
   },
   seedbomb: {

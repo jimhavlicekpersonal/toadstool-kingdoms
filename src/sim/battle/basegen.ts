@@ -37,6 +37,18 @@ function placeInRing(rng: Rng, o: Occ, s: number, c: number, r1: number, r2: num
   return null;
 }
 
+/** Any free spot whose footprint stays a tile clear of the walled rectangle (fallback when the outer band is full). */
+function outsideSpot(rng: Rng, o: Occ, s: number, x0: number, y0: number, x1: number, y1: number): { x: number; y: number } | null {
+  const spots: { x: number; y: number }[] = [];
+  for (let y = 1; y + s <= o.size - 1; y++) {
+    for (let x = 1; x + s <= o.size - 1; x++) {
+      const clear = x + s < x0 || y + s < y0 || x > x1 + 1 || y > y1 + 1;
+      if (clear && free(o, x, y, s, 1)) spots.push({ x, y });
+    }
+  }
+  return spots.length ? spots[int(rng, 0, spots.length - 1)] : null;
+}
+
 export function opponentName(rng: Rng, data: GameData): string {
   return `${pick(rng, data.names.placeFirst)} ${pick(rng, data.names.placeSecond)}`;
 }
@@ -73,66 +85,97 @@ export function generateOpponent(seed: number, hallLevel: number, data: GameData
     const below = Math.max(0, Math.min(3, Math.round((1 - bias) * 2 + next(rng) - 0.5)));
     return Math.max(1, max - below);
   };
-  const plan: { type: string; r1: number; r2: number }[] = [];
+  const layout = data.battle.baseLayoutByHall?.[hl - 1] ?? { hedgeGaps: 2, innerRing: false };
+  // Inside the hedge ring: everything but collectors and Beaver Lodges, so the
+  // 50% star needs a breach rather than picking off the outskirts.
+  const coreCats = ['guardian', 'defense', 'storage', 'trap', 'military', 'social'];
+  const core: string[] = [];
+  const outer: string[] = [];
   for (const [type, lim] of Object.entries(limits)) {
     const def = buildingDef(data, type);
     if (def.category === 'hedge' || def.category === 'decor') continue;
     let count = lim.count;
     if (def.category === 'builder') count = 2 + int(rng, 0, Math.min(3, lim.count - 2));
     else if (def.category === 'collector') count = Math.max(1, int(rng, Math.ceil(count / 2), count));
-    for (let i = 0; i < count; i++) {
-      const ring =
-        def.category === 'defense' || def.category === 'trap' ? { r1: 3, r2: 7 } : def.category === 'storage' ? { r1: 2, r2: 6 } : { r1: 8, r2: 13 };
-      plan.push({ type, ...ring });
-    }
+    for (let i = 0; i < count; i++) (coreCats.includes(def.category) ? core : outer).push(type);
   }
-  // Defenses and storages first so they sit in the core.
-  const order = (t: string) => ({ defense: 0, storage: 1, trap: 2 } as Record<string, number>)[buildingDef(data, t).category] ?? 3;
-  plan.sort((a, b) => order(a.type) - order(b.type));
-  for (const p of plan) {
-    const def = buildingDef(data, p.type);
-    const spot = placeInRing(rng, o, def.size, c, p.r1, p.r2, def.category === 'trap' ? 0 : 1);
-    if (spot) add(p.type, levelFor(p.type), spot.x, spot.y);
+  // 1. The core: guardians, defenses, storages and traps close to the Elder Toadstool.
+  const order = (t: string) => ({ guardian: -1, defense: 0, storage: 1, military: 2, social: 2, trap: 3 } as Record<string, number>)[buildingDef(data, t).category] ?? 4;
+  core.sort((a, b) => order(a) - order(b));
+  for (const type of core) {
+    const def = buildingDef(data, type);
+    const ring = def.category === 'defense' || def.category === 'trap' ? { r1: 3, r2: 6 } : def.category === 'military' || def.category === 'social' ? { r1: 4, r2: 7 } : { r1: 2, r2: 5 };
+    const spot = placeInRing(rng, o, def.size, c, ring.r1, ring.r2, def.category === 'trap' ? 0 : 1);
+    if (spot) add(type, levelFor(type), spot.x, spot.y);
   }
 
-  // A hedge ring around the core, with a few gaps.
+  // 2. Hedges, before the outer buildings so nothing sits on the ring:
+  //    an inner ring around the Elder Toadstool on higher levels, then a ring
+  //    around the core with a few 2-tile gaps (fewer on higher levels).
   const hedgeLimit = limits.bramble_hedge;
+  let rx0 = c - 2;
+  let ry0 = c - 2;
+  let rx1 = c + 2;
+  let ry1 = c + 2;
   if (hedgeLimit && hedgeLimit.count > 0) {
-    const core = buildings.filter((b) => ['hall', 'defense', 'storage'].includes(buildingDef(data, b.type).category));
+    const lvl = levelFor('bramble_hedge');
+    let budget = hedgeLimit.count;
+    const ringTiles = (x0: number, y0: number, x1: number, y1: number) => {
+      const t: [number, number][] = [];
+      for (let x = x0; x <= x1; x++) t.push([x, y0]);
+      for (let y = y0 + 1; y <= y1; y++) t.push([x1, y]);
+      for (let x = x1 - 1; x >= x0; x--) t.push([x, y1]);
+      for (let y = y1 - 1; y > y0; y--) t.push([x0, y]);
+      return t;
+    };
+    const lay = (tiles: [number, number][], gaps: number) => {
+      // Gaps are 2 tiles wide and spread evenly from a random start. With too
+      // few hedges for the whole ring, they form one continuous arc.
+      const start = int(rng, 0, tiles.length - 1);
+      const skip = new Set<number>();
+      for (let g = 0; g < gaps; g++) {
+        const at = Math.floor((g * tiles.length) / Math.max(1, gaps));
+        skip.add(at);
+        skip.add((at + 1) % tiles.length);
+      }
+      for (let k = 0; k < tiles.length && budget > 0; k++) {
+        if (skip.has(k)) continue;
+        const [x, y] = tiles[(start + k) % tiles.length];
+        if (x < 0 || y < 0 || x >= map || y >= map || o.cells[y * map + x]) continue;
+        add('bramble_hedge', lvl, x, y);
+        budget--;
+      }
+    };
+    if (layout.innerRing) {
+      const hb = buildings[0];
+      lay(ringTiles(hb.x - 1, hb.y - 1, hb.x + hallSize, hb.y + hallSize), 1);
+    }
+    const coreB = buildings.filter((b) => b.type !== 'bramble_hedge' && buildingDef(data, b.type).category !== 'trap');
     let x0 = map;
     let y0 = map;
     let x1 = 0;
     let y1 = 0;
-    for (const b of core) {
-      const s = buildingDef(data, b.type).size;
+    for (const b of coreB) {
+      const sz = buildingDef(data, b.type).size;
       x0 = Math.min(x0, b.x);
       y0 = Math.min(y0, b.y);
-      x1 = Math.max(x1, b.x + s);
-      y1 = Math.max(y1, b.y + s);
+      x1 = Math.max(x1, b.x + sz);
+      y1 = Math.max(y1, b.y + sz);
     }
-    x0 -= 2;
-    y0 -= 2;
-    x1 += 1;
-    y1 += 1;
-    const ring: [number, number][] = [];
-    for (let x = x0; x <= x1; x++) ring.push([x, y0], [x, y1]);
-    for (let y = y0 + 1; y < y1; y++) ring.push([x0, y], [x1, y]);
-    const gaps = hl >= 4 ? 1 : hl >= 2 ? 2 : 3;
-    const gapStarts = new Set<number>();
-    for (let g = 0; g < gaps; g++) gapStarts.add(int(rng, 0, ring.length - 1));
-    const skip = new Set<number>();
-    for (const g of gapStarts) {
-      skip.add(g);
-      skip.add((g + 2) % ring.length);
-    }
-    let placed = 0;
-    const lvl = levelFor('bramble_hedge');
-    ring.forEach(([x, y], i) => {
-      if (placed >= hedgeLimit.count || skip.has(i)) return;
-      if (x < 0 || y < 0 || x >= map || y >= map || o.cells[y * map + x]) return;
-      add('bramble_hedge', lvl, x, y);
-      placed++;
-    });
+    rx0 = x0 - 2;
+    ry0 = y0 - 2;
+    rx1 = x1 + 1;
+    ry1 = y1 + 1;
+    lay(ringTiles(rx0, ry0, rx1, ry1), layout.hedgeGaps);
+  }
+
+  // 3. Everything else outside the ring, with a lane between.
+  const ringR = Math.max(c - rx0, rx1 - c, c - ry0, ry1 - c);
+  for (const type of outer) {
+    const def = buildingDef(data, type);
+    const r1 = Math.ceil(Math.max(8, ringR + 2 + def.size / 2));
+    const spot = placeInRing(rng, o, def.size, c, r1, Math.min(Math.floor(map / 2) - 1, r1 + 6), 1) ?? outsideSpot(rng, o, def.size, rx0, ry0, rx1, ry1);
+    if (spot) add(type, levelFor(type), spot.x, spot.y);
   }
 
   // Loot: spread between storages, collectors and the hall.
@@ -158,10 +201,8 @@ export function generateOpponent(seed: number, hallLevel: number, data: GameData
     rest += give(holders('collector'), Math.floor(total * shares.collector));
     const hall = buildings[0];
     const hallAmount = total - Math.floor(total * shares.storage) - Math.floor(total * shares.collector) + rest;
+    // Shares with no holder (no storages or collectors) came back in `rest`, so they land in the hall.
     hall.loot = { ...(hall.loot ?? {}), [res]: ((hall.loot as Cost)?.[res] ?? 0) + hallAmount };
-    // Unused shares (no storages/collectors) also land in the hall.
-    if (!holders('storage').length) hall.loot[res] = (hall.loot[res] ?? 0) + Math.floor(total * shares.storage);
-    if (!holders('collector').length) hall.loot[res] = (hall.loot[res] ?? 0) + Math.floor(total * shares.collector);
   }
   return { name: opponentName(rng, data), hallLevel: hl, buildings };
 }

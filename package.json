@@ -17,9 +17,11 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
+    "typecheck:tools": "tsc -p tools/tsconfig.json --noEmit",
     "server:build": "vite build --config vite.server.config.ts",
     "server:start": "node dist-server/main.js",
     "server:dev": "npm run server:build && npm run server:start",
+    "sim:playthroughs": "vite build --config vite.sim.config.ts && node dist-sim/playthroughs.js",
     "cap:sync": "npm run build && cap sync",
     "cap:ios": "npm run build && cap sync ios && cap open ios",
     "cap:android": "npm run build && cap sync android && cap open android"

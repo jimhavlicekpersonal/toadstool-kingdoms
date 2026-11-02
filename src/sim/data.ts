@@ -15,6 +15,7 @@ import social from '../data/social.json';
 import daily from '../data/daily.json';
 import events from '../data/events.json';
 import notifications from '../data/notifications.json';
+import guardians from '../data/guardians.json';
 import type { BuildingDef, BuildingType, GameData, LevelDef, TroopLevelDef } from './types';
 
 /** The game's balance data, straight from src/data/*.json. */
@@ -36,6 +37,7 @@ export const defaultData: GameData = {
   daily: daily as unknown as GameData['daily'],
   events: events as unknown as GameData['events'],
   notifications: notifications as unknown as GameData['notifications'],
+  guardians: guardians as unknown as GameData['guardians'],
 };
 
 export function buildingDef(data: GameData, type: BuildingType): BuildingDef {
@@ -75,4 +77,16 @@ export function troopLevel(data: GameData, type: string, level = 1): TroopLevelD
   const levels = troopDef(data, type).levels;
   const i = Math.max(1, Math.min(levels.length, Math.floor(level) || 1)) - 1;
   return levels[i];
+}
+
+export function guardianDef(data: GameData, type: string) {
+  const def = data.guardians.animals[type];
+  if (!def) throw new Error(`Unknown guardian type: ${type}`);
+  return def;
+}
+
+/** Stats of a guardian animal at a level (clamped to the levels that exist). */
+export function guardianLevel(data: GameData, type: string, level = 1): { level: number; hp: number; damage: number } {
+  const levels = guardianDef(data, type).levels;
+  return levels[Math.max(1, Math.min(levels.length, Math.floor(level) || 1)) - 1];
 }

@@ -88,18 +88,14 @@
         },
         "army_camp": {
           "count": 1,
-          "maxLevel": 3
+          "maxLevel": 4
         },
         "acorn_cannon": {
           "count": 2,
-          "maxLevel": 3
-        },
-        "wasp_nest": {
-          "count": 1,
           "maxLevel": 2
         },
         "bramble_hedge": {
-          "count": 40,
+          "count": 36,
           "maxLevel": 2
         },
         "flower_bed": {
@@ -119,6 +115,14 @@
           "maxLevel": 1
         },
         "grove_lodge": {
+          "count": 1,
+          "maxLevel": 1
+        },
+        "guardian_burrow": {
+          "count": 1,
+          "maxLevel": 1
+        },
+        "wasp_nest": {
           "count": 1,
           "maxLevel": 1
         }
@@ -126,84 +130,6 @@
     },
     {
       "level": 3,
-      "troopLevelCap": 2,
-      "limits": {
-        "beaver_lodge": {
-          "count": 5,
-          "maxLevel": 1
-        },
-        "acorn_orchard": {
-          "count": 3,
-          "maxLevel": 6
-        },
-        "dewdrop_well": {
-          "count": 3,
-          "maxLevel": 6
-        },
-        "acorn_silo": {
-          "count": 2,
-          "maxLevel": 6
-        },
-        "dew_cistern": {
-          "count": 2,
-          "maxLevel": 6
-        },
-        "burrow_barracks": {
-          "count": 1,
-          "maxLevel": 4
-        },
-        "army_camp": {
-          "count": 2,
-          "maxLevel": 3
-        },
-        "acorn_cannon": {
-          "count": 2,
-          "maxLevel": 4
-        },
-        "wasp_nest": {
-          "count": 1,
-          "maxLevel": 3
-        },
-        "pinecone_catapult": {
-          "count": 1,
-          "maxLevel": 1
-        },
-        "bramble_hedge": {
-          "count": 60,
-          "maxLevel": 3
-        },
-        "thorn_snare": {
-          "count": 2,
-          "maxLevel": 2
-        },
-        "sap_puddle": {
-          "count": 1,
-          "maxLevel": 1
-        },
-        "flower_bed": {
-          "count": 20,
-          "maxLevel": 1
-        },
-        "lantern_post": {
-          "count": 10,
-          "maxLevel": 1
-        },
-        "mushroom_ring": {
-          "count": 4,
-          "maxLevel": 1
-        },
-        "mossy_statue": {
-          "count": 2,
-          "maxLevel": 1
-        },
-        "grove_lodge": {
-          "count": 1,
-          "maxLevel": 2
-        }
-      }
-    },
-    {
-      "level": 4,
       "troopLevelCap": 3,
       "limits": {
         "beaver_lodge": {
@@ -211,56 +137,48 @@
           "maxLevel": 1
         },
         "acorn_orchard": {
-          "count": 4,
-          "maxLevel": 8
+          "count": 3,
+          "maxLevel": 6
         },
         "dewdrop_well": {
-          "count": 4,
-          "maxLevel": 8
+          "count": 3,
+          "maxLevel": 6
         },
         "acorn_silo": {
           "count": 2,
-          "maxLevel": 8
+          "maxLevel": 6
         },
         "dew_cistern": {
           "count": 2,
-          "maxLevel": 8
+          "maxLevel": 6
         },
         "burrow_barracks": {
           "count": 1,
-          "maxLevel": 5
+          "maxLevel": 4
         },
         "army_camp": {
           "count": 2,
-          "maxLevel": 5
+          "maxLevel": 3
         },
         "acorn_cannon": {
-          "count": 3,
-          "maxLevel": 5
+          "count": 2,
+          "maxLevel": 3
         },
         "wasp_nest": {
-          "count": 2,
-          "maxLevel": 4
-        },
-        "pinecone_catapult": {
           "count": 1,
-          "maxLevel": 2
-        },
-        "firefly_tower": {
-          "count": 1,
-          "maxLevel": 1
+          "maxLevel": 3
         },
         "bramble_hedge": {
-          "count": 80,
-          "maxLevel": 4
+          "count": 100,
+          "maxLevel": 3
         },
         "thorn_snare": {
-          "count": 3,
-          "maxLevel": 3
+          "count": 2,
+          "maxLevel": 1
         },
         "sap_puddle": {
           "count": 1,
-          "maxLevel": 2
+          "maxLevel": 1
         },
         "flower_bed": {
           "count": 20,
@@ -280,12 +198,24 @@
         },
         "grove_lodge": {
           "count": 1,
-          "maxLevel": 3
+          "maxLevel": 2
+        },
+        "guardian_burrow": {
+          "count": 1,
+          "maxLevel": 2
+        },
+        "firefly_tower": {
+          "count": 1,
+          "maxLevel": 1
+        },
+        "pinecone_catapult": {
+          "count": 1,
+          "maxLevel": 1
         }
       }
     },
     {
-      "level": 5,
+      "level": 4,
       "troopLevelCap": 4,
       "limits": {
         "beaver_lodge": {
@@ -293,6 +223,92 @@
           "maxLevel": 1
         },
         "acorn_orchard": {
+          "count": 4,
+          "maxLevel": 8
+        },
+        "dewdrop_well": {
+          "count": 4,
+          "maxLevel": 8
+        },
+        "acorn_silo": {
+          "count": 2,
+          "maxLevel": 8
+        },
+        "dew_cistern": {
+          "count": 2,
+          "maxLevel": 8
+        },
+        "burrow_barracks": {
+          "count": 1,
+          "maxLevel": 5
+        },
+        "army_camp": {
+          "count": 2,
+          "maxLevel": 5
+        },
+        "acorn_cannon": {
+          "count": 3,
+          "maxLevel": 4
+        },
+        "wasp_nest": {
+          "count": 2,
+          "maxLevel": 4
+        },
+        "pinecone_catapult": {
+          "count": 1,
+          "maxLevel": 2
+        },
+        "firefly_tower": {
+          "count": 2,
+          "maxLevel": 2
+        },
+        "bramble_hedge": {
+          "count": 115,
+          "maxLevel": 4
+        },
+        "thorn_snare": {
+          "count": 2,
+          "maxLevel": 3
+        },
+        "sap_puddle": {
+          "count": 1,
+          "maxLevel": 2
+        },
+        "flower_bed": {
+          "count": 20,
+          "maxLevel": 1
+        },
+        "lantern_post": {
+          "count": 10,
+          "maxLevel": 1
+        },
+        "mushroom_ring": {
+          "count": 4,
+          "maxLevel": 1
+        },
+        "mossy_statue": {
+          "count": 2,
+          "maxLevel": 1
+        },
+        "grove_lodge": {
+          "count": 1,
+          "maxLevel": 3
+        },
+        "guardian_burrow": {
+          "count": 1,
+          "maxLevel": 3
+        }
+      }
+    },
+    {
+      "level": 5,
+      "troopLevelCap": 5,
+      "limits": {
+        "beaver_lodge": {
+          "count": 5,
+          "maxLevel": 1
+        },
+        "acorn_orchard": {
           "count": 5,
           "maxLevel": 10
         },
@@ -317,11 +333,11 @@
           "maxLevel": 5
         },
         "acorn_cannon": {
-          "count": 3,
+          "count": 4,
           "maxLevel": 6
         },
         "wasp_nest": {
-          "count": 2,
+          "count": 3,
           "maxLevel": 5
         },
         "pinecone_catapult": {
@@ -329,15 +345,15 @@
           "maxLevel": 3
         },
         "firefly_tower": {
-          "count": 1,
-          "maxLevel": 2
+          "count": 2,
+          "maxLevel": 3
         },
         "bramble_hedge": {
-          "count": 100,
+          "count": 145,
           "maxLevel": 5
         },
         "thorn_snare": {
-          "count": 4,
+          "count": 3,
           "maxLevel": 3
         },
         "sap_puddle": {
@@ -363,12 +379,16 @@
         "grove_lodge": {
           "count": 1,
           "maxLevel": 4
+        },
+        "guardian_burrow": {
+          "count": 1,
+          "maxLevel": 4
         }
       }
     },
     {
       "level": 6,
-      "troopLevelCap": 5,
+      "troopLevelCap": 6,
       "limits": {
         "beaver_lodge": {
           "count": 5,
@@ -399,7 +419,7 @@
           "maxLevel": 7
         },
         "acorn_cannon": {
-          "count": 4,
+          "count": 5,
           "maxLevel": 7
         },
         "wasp_nest": {
@@ -408,22 +428,22 @@
         },
         "pinecone_catapult": {
           "count": 2,
-          "maxLevel": 4
+          "maxLevel": 5
         },
         "firefly_tower": {
-          "count": 2,
-          "maxLevel": 3
+          "count": 3,
+          "maxLevel": 4
         },
         "bramble_hedge": {
-          "count": 125,
+          "count": 165,
           "maxLevel": 6
         },
         "thorn_snare": {
-          "count": 4,
+          "count": 1,
           "maxLevel": 4
         },
         "sap_puddle": {
-          "count": 2,
+          "count": 1,
           "maxLevel": 3
         },
         "flower_bed": {
@@ -443,6 +463,10 @@
           "maxLevel": 1
         },
         "grove_lodge": {
+          "count": 1,
+          "maxLevel": 5
+        },
+        "guardian_burrow": {
           "count": 1,
           "maxLevel": 5
         }

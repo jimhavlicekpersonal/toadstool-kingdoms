@@ -3,7 +3,7 @@
  * floating-point functions beyond + - * / and sqrt, so the same setup and
  * deployments replay identically on every device.
  */
-import { buildingDef, levelDef, troopDef, troopLevel } from '../data';
+import { buildingDef, guardianDef, guardianLevel, levelDef, troopDef, troopLevel } from '../data';
 import { createRng, next, type Rng } from '../rng';
 import type { CombatDef, Cost, GameData, ResourceKind } from '../types';
 import { BLOCKED, HEDGE, distToRect, findPath, type PathGrid, type Rect } from './pathfind';
@@ -18,7 +18,7 @@ export interface SimBuilding {
   size: number;
   hp: number;
   maxHp: number;
-  kind: 'hall' | 'defense' | 'hedge' | 'trap' | 'other';
+  kind: 'hall' | 'defense' | 'hedge' | 'trap' | 'burrow' | 'other';
   destroyed: boolean;
   loot: Cost;
   combat: (CombatDef & { damage: number }) | null;
@@ -26,10 +26,16 @@ export interface SimBuilding {
   targetTroop: number;
   /** Traps stay hidden until they go off. */
   hidden: boolean;
+  /** Guardian Burrow: guardians still inside, whether raiders have been spotted, and the release timer. */
+  pending: { type: string; level: number }[];
+  triggered: boolean;
+  releaseCooldown: number;
 }
 
 export interface SimTroop {
   id: number;
+  /** 'attack' = deployed by the attacker; 'guard' = a guardian animal from the base. */
+  side: 'attack' | 'guard';
   type: string;
   x: number;
   y: number;
@@ -50,6 +56,11 @@ export interface SimTroop {
   attacking: boolean;
   facing: 1 | -1;
   slowTicks: number;
+  /** The enemy unit this one is fighting (-1 = none). */
+  foe: number;
+  /** Guardians: the burrow they defend (they walk back when nothing is near). */
+  homeX: number;
+  homeY: number;
 }
 
 export interface SimProjectile {
@@ -69,6 +80,8 @@ export interface SimProjectile {
   hitsGround: boolean;
   /** Fired from height (towers) or from the ground (troops). */
   arc: boolean;
+  /** Building or unit type that fired it (for kill counts). */
+  source: string;
 }
 
 export type SimEvent =
@@ -79,7 +92,8 @@ export type SimEvent =
   | { k: 'buildingHit'; building: number }
   | { k: 'destroyed'; building: number }
   | { k: 'troopDied'; troop: number }
-  | { k: 'trap'; building: number };
+  | { k: 'trap'; building: number }
+  | { k: 'guardian'; troop: number; building: number };
 
 export interface BattleSim {
   setup: BattleSetup;
@@ -103,6 +117,12 @@ export interface BattleSim {
   /** 1 where the attacker may deploy. */
   deployable: Uint8Array;
   nextProjectile: number;
+  /** True when the base has a Guardian Burrow (skips guardian checks otherwise). */
+  hasGuardians: boolean;
+  /** Attacking troops killed, by what killed them (building, trap or guardian type). */
+  kills: Record<string, number>;
+  /** Guardians the attacker defeated. */
+  guardiansDefeated: number;
 }
 
 const rect = (b: SimBuilding): Rect => ({ x: b.x, y: b.y, w: b.size, h: b.size });
@@ -120,7 +140,9 @@ export function createBattle(setup: BattleSetup, data: GameData): BattleSim {
     const def = buildingDef(data, bb.type);
     const ld = levelDef(data, bb.type, bb.level) ?? def.levels[0];
     const kind: SimBuilding['kind'] =
-      def.category === 'hall' ? 'hall' : def.category === 'defense' ? 'defense' : def.category === 'hedge' ? 'hedge' : def.category === 'trap' ? 'trap' : 'other';
+      def.category === 'hall' ? 'hall' : def.category === 'defense' ? 'defense' : def.category === 'hedge' ? 'hedge' : def.category === 'trap' ? 'trap' : def.category === 'guardian' ? 'burrow' : 'other';
+    const pending: { type: string; level: number }[] = [];
+    if (kind === 'burrow') for (const [g, n] of Object.entries(ld.guardians ?? {})) for (let i = 0; i < n.count; i++) pending.push({ type: g, level: n.level });
     return {
       id: bb.id,
       type: bb.type,
@@ -137,6 +159,9 @@ export function createBattle(setup: BattleSetup, data: GameData): BattleSim {
       cooldown: 0,
       targetTroop: -1,
       hidden: kind === 'trap',
+      pending,
+      triggered: false,
+      releaseCooldown: 0,
     };
   });
   const cells = new Uint8Array(size * size);
@@ -145,11 +170,33 @@ export function createBattle(setup: BattleSetup, data: GameData): BattleSim {
     for (let y = b.y; y < b.y + b.size; y++) for (let x = b.x; x < b.x + b.size; x++) cells[y * size + x] = b.kind === 'hedge' ? HEDGE : BLOCKED;
   });
   const m = data.battle.deployMarginTiles;
-  const deployable = new Uint8Array(size * size).fill(1);
+  const near = new Uint8Array(size * size);
   for (const b of buildings) {
     if (b.kind === 'trap') continue;
     for (let y = Math.max(0, b.y - m); y < Math.min(size, b.y + b.size + m); y++) {
-      for (let x = Math.max(0, b.x - m); x < Math.min(size, b.x + b.size + m); x++) deployable[y * size + x] = 0;
+      for (let x = Math.max(0, b.x - m); x < Math.min(size, b.x + b.size + m); x++) near[y * size + x] = 1;
+    }
+  }
+  // Troops land only on open ground reachable from the map edge: the inside of
+  // a closed hedge ring (gaps narrower than the margin count as closed) is off limits.
+  const deployable = new Uint8Array(size * size);
+  const stack: number[] = [];
+  for (let i = 0; i < size; i++) {
+    for (const j of [i, (size - 1) * size + i, i * size, i * size + size - 1]) {
+      if (!near[j] && !deployable[j]) {
+        deployable[j] = 1;
+        stack.push(j);
+      }
+    }
+  }
+  while (stack.length) {
+    const j = stack.pop()!;
+    const x = j % size;
+    const y = (j - x) / size;
+    for (const k of [x > 0 ? j - 1 : -1, x < size - 1 ? j + 1 : -1, y > 0 ? j - size : -1, y < size - 1 ? j + size : -1]) {
+      if (k < 0 || near[k] || deployable[k]) continue;
+      deployable[k] = 1;
+      stack.push(k);
     }
   }
   return {
@@ -173,6 +220,9 @@ export function createBattle(setup: BattleSetup, data: GameData): BattleSim {
     grid: { size, cells },
     deployable,
     nextProjectile: 1,
+    hasGuardians: buildings.some((b) => b.kind === 'burrow' && b.pending.length > 0),
+    kills: {},
+    guardiansDefeated: 0,
   };
 }
 
@@ -195,6 +245,7 @@ export function deploy(sim: BattleSim, d: Deployment): boolean {
   const y = Math.floor(d.y) + 0.5 + (next(sim.rng) * 2 - 1) * s;
   const t: SimTroop = {
     id: sim.troops.length,
+    side: 'attack',
     type: d.troop,
     x,
     y,
@@ -213,6 +264,9 @@ export function deploy(sim: BattleSim, d: Deployment): boolean {
     attacking: false,
     facing: 1,
     slowTicks: 0,
+    foe: -1,
+    homeX: 0,
+    homeY: 0,
   };
   sim.troops.push(t);
   sim.remaining[d.troop] -= 1;
@@ -237,7 +291,7 @@ function damageBuilding(sim: BattleSim, bi: number, amount: number): void {
   sim.events.push({ k: 'destroyed', building: bi });
 }
 
-function damageTroop(sim: BattleSim, ti: number, amount: number): void {
+function damageTroop(sim: BattleSim, ti: number, amount: number, source = ''): void {
   const t = sim.troops[ti];
   if (t.dead) return;
   t.hp -= amount;
@@ -245,8 +299,141 @@ function damageTroop(sim: BattleSim, ti: number, amount: number): void {
   if (t.hp <= 0) {
     t.hp = 0;
     t.dead = true;
+    if (t.side === 'attack') sim.kills[source] = (sim.kills[source] ?? 0) + 1;
+    else sim.guardiansDefeated++;
     sim.events.push({ k: 'troopDied', troop: ti });
   }
+}
+
+// ---------------------------------------------------------------- Guardians
+
+/** Release guardians from burrows once raiders come close (all at once if the burrow falls). */
+function stepBurrows(sim: BattleSim): void {
+  if (!sim.hasGuardians) return;
+  const g = sim.data.guardians;
+  sim.buildings.forEach((b, bi) => {
+    if (b.kind !== 'burrow' || !b.pending.length) return;
+    const c = center(b);
+    if (!b.triggered) {
+      b.triggered = b.destroyed || sim.troops.some((t) => t.side === 'attack' && !t.dead && dist(t.x, t.y, c.x, c.y) <= g.triggerRange + b.size / 2);
+      if (!b.triggered) return;
+    }
+    if (b.releaseCooldown > 0 && !b.destroyed) {
+      b.releaseCooldown--;
+      return;
+    }
+    const n = b.destroyed ? b.pending.length : 1;
+    for (let i = 0; i < n; i++) spawnGuardian(sim, bi, b.pending.shift()!);
+    b.releaseCooldown = g.releaseIntervalTicks;
+  });
+}
+
+function spawnGuardian(sim: BattleSim, bi: number, gu: { type: string; level: number }): void {
+  const b = sim.buildings[bi];
+  const def = guardianDef(sim.data, gu.type);
+  const stats = guardianLevel(sim.data, gu.type, gu.level);
+  const c = center(b);
+  const x = c.x + (next(sim.rng) * 2 - 1) * 0.6;
+  const y = c.y + b.size / 2 + (next(sim.rng) * 2 - 1) * 0.3;
+  const t: SimTroop = {
+    id: sim.troops.length, side: 'guard', type: gu.type, x, y, px: x, py: y, level: stats.level, damage: stats.damage, hp: stats.hp, maxHp: stats.hp,
+    air: def.air, target: -1, path: null, pathPos: 0, cooldown: 0, dead: false, attacking: false, facing: -1, slowTicks: 0, foe: -1, homeX: c.x, homeY: c.y,
+  };
+  sim.troops.push(t);
+  sim.events.push({ k: 'guardian', troop: t.id, building: bi });
+}
+
+function stepGuardian(sim: BattleSim, ti: number): void {
+  const t = sim.troops[ti];
+  if (t.dead) return;
+  t.px = t.x;
+  t.py = t.y;
+  const def = guardianDef(sim.data, t.type);
+  const leash = sim.data.guardians.leashRange;
+  if (t.cooldown > 0) t.cooldown--;
+  const canHit = (u: SimTroop) => !u.dead && u.side === 'attack' && (u.air ? def.targets !== 'ground' : def.targets !== 'air') && dist(u.x, u.y, t.homeX, t.homeY) <= leash;
+  if (t.foe < 0 || !canHit(sim.troops[t.foe])) {
+    t.foe = -1;
+    let best = Infinity;
+    sim.troops.forEach((u, i) => {
+      if (!canHit(u)) return;
+      const d = dist(t.x, t.y, u.x, u.y);
+      if (d < best) {
+        best = d;
+        t.foe = i;
+      }
+    });
+  }
+  if (t.foe < 0) {
+    t.attacking = false;
+    if (dist(t.x, t.y, t.homeX, t.homeY) > 0.6) moveToward(t, t.homeX, t.homeY, def.speed);
+    return;
+  }
+  const f = sim.troops[t.foe];
+  if (dist(t.x, t.y, f.x, f.y) > def.range) {
+    t.attacking = false;
+    moveToward(t, f.x, f.y, def.speed);
+    return;
+  }
+  t.attacking = true;
+  t.facing = f.x - f.y >= t.x - t.y ? 1 : -1;
+  if (t.cooldown > 0) return;
+  t.cooldown = def.attackIntervalTicks;
+  if (def.projectile) {
+    const travel = Math.max(1, Math.ceil(dist(t.x, t.y, f.x, f.y) / (def.projectileSpeed ?? 1)));
+    sim.projectiles.push({
+      id: sim.nextProjectile++, kind: def.projectile, fromX: t.x, fromY: t.y, toX: f.x, toY: f.y, total: travel, left: travel,
+      damage: t.damage, splash: 0, targetTroop: t.foe, targetBuilding: -1, hitsAir: true, hitsGround: true, arc: false, source: t.type,
+    });
+  } else {
+    damageTroop(sim, t.foe, t.damage, t.type);
+  }
+}
+
+/**
+ * Attacking troops fight a guardian that comes within reach. Troops that go
+ * for defenses (Beetle Brutes, Owl Bombers) ignore guardians, and only ranged
+ * troops can hit flying ones. Returns true if the troop spent its tick fighting.
+ */
+function fightGuardian(sim: BattleSim, t: SimTroop): boolean {
+  const def = troopDef(sim.data, t.type);
+  if (def.prefers === 'defense') return false;
+  const reach = def.range + sim.data.guardians.engageRange;
+  const canHit = (g: SimTroop) => !g.dead && g.side === 'guard' && (!g.air || def.range >= 2) && dist(t.x, t.y, g.x, g.y) <= reach;
+  if (t.foe < 0 || !canHit(sim.troops[t.foe])) {
+    t.foe = -1;
+    let best = Infinity;
+    sim.troops.forEach((g, i) => {
+      if (!canHit(g)) return;
+      const d = dist(t.x, t.y, g.x, g.y);
+      if (d < best) {
+        best = d;
+        t.foe = i;
+      }
+    });
+    if (t.foe < 0) return false;
+  }
+  const g = sim.troops[t.foe];
+  t.path = null;
+  if (dist(t.x, t.y, g.x, g.y) > def.range) {
+    t.attacking = false;
+    moveToward(t, g.x, g.y, t.slowTicks > 0 ? def.speed * 0.5 : def.speed);
+    return true;
+  }
+  t.attacking = true;
+  t.facing = g.x - g.y >= t.x - t.y ? 1 : -1;
+  if (t.cooldown > 0) return true;
+  t.cooldown = def.attackIntervalTicks;
+  if (def.projectile) {
+    const travel = Math.max(1, Math.ceil(dist(t.x, t.y, g.x, g.y) / (def.projectileSpeed ?? 1)));
+    sim.projectiles.push({
+      id: sim.nextProjectile++, kind: def.projectile, fromX: t.x, fromY: t.y, toX: g.x, toY: g.y, total: travel, left: travel,
+      damage: t.damage, splash: 0, targetTroop: t.foe, targetBuilding: -1, hitsAir: true, hitsGround: true, arc: true, source: t.type,
+    });
+  } else {
+    damageTroop(sim, t.foe, t.damage, t.type);
+  }
+  return true;
 }
 
 /** Nearest standing building this troop wants, by its preference. */
@@ -275,10 +462,15 @@ function chooseTarget(sim: BattleSim, t: SimTroop): number {
 function stepTroop(sim: BattleSim, ti: number): void {
   const t = sim.troops[ti];
   if (t.dead) return;
+  if (t.side === 'guard') {
+    stepGuardian(sim, ti);
+    return;
+  }
   t.px = t.x;
   t.py = t.y;
   const def = troopDef(sim.data, t.type);
   if (t.cooldown > 0) t.cooldown--;
+  if (sim.hasGuardians && fightGuardian(sim, t)) return;
   if (t.target < 0 || sim.buildings[t.target].destroyed) {
     t.target = chooseTarget(sim, t);
     t.path = null;
@@ -298,7 +490,7 @@ function stepTroop(sim: BattleSim, ti: number): void {
         const travel = Math.max(1, Math.ceil(d / (def.projectileSpeed ?? 1)));
         sim.projectiles.push({
           id: sim.nextProjectile++, kind: def.projectile, fromX: t.x, fromY: t.y, toX: c.x, toY: c.y, total: travel, left: travel,
-          damage: t.damage, splash: 0, targetTroop: -1, targetBuilding: t.target, hitsAir: false, hitsGround: false, arc: true,
+          damage: t.damage, splash: 0, targetTroop: -1, targetBuilding: t.target, hitsAir: false, hitsGround: false, arc: true, source: t.type,
         });
       } else {
         damageBuilding(sim, t.target, t.damage);
@@ -379,7 +571,7 @@ function stepDefense(sim: BattleSim, bi: number): void {
   const cx = b.x + b.size / 2;
   const cy = b.y + b.size / 2;
   const ok = (t: SimTroop) => {
-    if (t.dead) return false;
+    if (t.dead || t.side !== 'attack') return false;
     if (t.air ? c.targets === 'ground' : c.targets === 'air') return false;
     const d = dist(cx, cy, t.x, t.y);
     return d <= c.range && d >= (c.minRange ?? 0);
@@ -411,7 +603,7 @@ function stepDefense(sim: BattleSim, bi: number): void {
   sim.projectiles.push({
     id: sim.nextProjectile++, kind: c.projectile, fromX: cx, fromY: cy, toX, toY, total: travel, left: travel,
     damage: c.damage, splash: c.splashRadius ?? 0, targetTroop: c.splashRadius ? -1 : b.targetTroop, targetBuilding: -1,
-    hitsAir: c.targets !== 'ground', hitsGround: c.targets !== 'air', arc: Boolean(c.splashRadius),
+    hitsAir: c.targets !== 'ground', hitsGround: c.targets !== 'air', arc: Boolean(c.splashRadius), source: b.type,
   });
   sim.events.push({ k: 'fire', building: bi });
 }
@@ -423,16 +615,16 @@ function stepTraps(sim: BattleSim): void {
     if (!c) return;
     const cx = b.x + b.size / 2;
     const cy = b.y + b.size / 2;
-    const triggered = sim.troops.some((t) => !t.dead && !t.air && dist(cx, cy, t.x, t.y) <= c.range);
+    const triggered = sim.troops.some((t) => t.side === 'attack' && !t.dead && !t.air && dist(cx, cy, t.x, t.y) <= c.range);
     if (!triggered) return;
     b.hidden = false;
     b.destroyed = true;
     sim.events.push({ k: 'trap', building: bi });
     const radius = c.splashRadius ?? c.range;
     sim.troops.forEach((t, ti) => {
-      if (t.dead || t.air || dist(cx, cy, t.x, t.y) > radius) return;
+      if (t.side !== 'attack' || t.dead || t.air || dist(cx, cy, t.x, t.y) > radius) return;
       if (c.projectile === 'sap') t.slowTicks = 40;
-      if (c.damage > 0) damageTroop(sim, ti, c.damage);
+      if (c.damage > 0) damageTroop(sim, ti, c.damage, b.type);
     });
     sim.events.push({ k: 'hit', x: cx, y: cy, kind: c.projectile, splash: radius });
   });
@@ -451,14 +643,14 @@ function stepProjectiles(sim: BattleSim): void {
       sim.events.push({ k: 'hit', x: p.toX, y: p.toY, kind: p.kind, splash: 0 });
     } else if (p.splash > 0) {
       sim.troops.forEach((t, ti) => {
-        if (t.dead || (t.air ? !p.hitsAir : !p.hitsGround)) return;
-        if (dist(p.toX, p.toY, t.x, t.y) <= p.splash) damageTroop(sim, ti, p.damage);
+        if (t.side !== 'attack' || t.dead || (t.air ? !p.hitsAir : !p.hitsGround)) return;
+        if (dist(p.toX, p.toY, t.x, t.y) <= p.splash) damageTroop(sim, ti, p.damage, p.source);
       });
       sim.events.push({ k: 'hit', x: p.toX, y: p.toY, kind: p.kind, splash: p.splash });
     } else if (p.targetTroop >= 0) {
       const t = sim.troops[p.targetTroop];
       if (!t.dead) {
-        damageTroop(sim, p.targetTroop, p.damage);
+        damageTroop(sim, p.targetTroop, p.damage, p.source);
         sim.events.push({ k: 'hit', x: t.x, y: t.y, kind: p.kind, splash: 0 });
       }
     }
@@ -472,6 +664,7 @@ export function step(sim: BattleSim, deployments: Deployment[] = []): void {
   sim.events = [];
   for (const d of deployments) deploy(sim, d);
   for (let i = 0; i < sim.troops.length; i++) stepTroop(sim, i);
+  stepBurrows(sim);
   stepTraps(sim);
   for (let i = 0; i < sim.buildings.length; i++) stepDefense(sim, i);
   stepProjectiles(sim);
@@ -479,8 +672,8 @@ export function step(sim: BattleSim, deployments: Deployment[] = []): void {
   if (sim.destroyedCount >= sim.countable) end(sim, 'destroyed');
   else if (sim.tick >= sim.duration) end(sim, 'time');
   else if (
-    sim.troops.length > 0 &&
-    sim.troops.every((t) => t.dead) &&
+    sim.troops.some((t) => t.side === 'attack') &&
+    sim.troops.every((t) => t.dead || t.side !== 'attack') &&
     Object.values(sim.remaining).every((v) => v <= 0) &&
     sim.projectiles.length === 0
   ) {

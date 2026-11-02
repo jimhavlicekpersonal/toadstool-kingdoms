@@ -270,7 +270,8 @@ export class BattleScene extends Phaser.Scene {
       if (t.attacking && !t.air) v.image.setScale(v.baseScale * (1 + Math.max(0, Math.sin(now / 60)) * 0.08), v.baseScale * (1 - Math.max(0, Math.sin(now / 60)) * 0.06));
       else if (v.image.scaleX !== v.baseScale && !this.tweens.isTweening(v.image)) v.image.setScale(v.baseScale);
       v.shadow.setPosition(w.x, w.y + 1);
-      if (t.hp < t.maxHp) this.drawBar(v.bar, w.x, w.y - lift - 34, t.hp / t.maxHp, 0xffd23f);
+      // Guardians (the base's defenders) get red health bars, attackers yellow.
+      if (t.hp < t.maxHp) this.drawBar(v.bar, w.x, w.y - lift - 34, t.hp / t.maxHp, t.side === 'guard' ? 0xff6b5b : 0xffd23f);
     });
 
     // Projectiles.
@@ -290,7 +291,7 @@ export class BattleScene extends Phaser.Scene {
       const arc = p.arc ? 4 * 70 * prog * (1 - prog) : 0;
       img.setPosition(w.x, w.y - startH * (1 - prog) - arc - 8);
       if (p.kind === 'pinecone' || p.kind === 'acorn' || p.kind === 'seedbomb') img.setAngle(prog * 360);
-      if (p.kind === 'sting') {
+      if (p.kind === 'sting' || p.kind === 'feather') {
         const to = tileToWorld(p.toX, p.toY);
         img.setRotation(Math.atan2(to.y - w.y, to.x - w.x));
       }
@@ -328,6 +329,11 @@ export class BattleScene extends Phaser.Scene {
           const sy = v.image.scaleY;
           this.tweens.add({ targets: v.image, scaleY: sy * 0.94, duration: 70, yoyo: true });
         }
+      } else if (e.k === 'guardian') {
+        const t = sim.troops[e.troop];
+        const w = tileToWorld(t.x, t.y);
+        this.puff(w.x, w.y - 6, 0.7);
+        sound.play('notify');
       } else if (e.k === 'deploy' && this.session.mode === 'replay') {
         sound.play('deploy');
       } else if (e.k === 'trap') {

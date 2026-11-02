@@ -1,7 +1,7 @@
 /** Scouting (#1, #2), trophy-based matchmaking (#3), trophy equilibrium (#4) and the loot penalty. */
 import { describe, expect, it } from 'vitest';
 import { totalLoot } from '../../src/sim/battle/basegen';
-import { matchStrength, opponentFor, strengthFor } from '../../src/sim/matchmaking';
+import { applyLootPenalty, matchStrength, opponentFor, readiness, strengthFor } from '../../src/sim/matchmaking';
 import { lossTrophies, winTrophies } from '../../src/sim/ranks';
 import { createRng, next } from '../../src/sim/rng';
 import type { VillageState } from '../../src/sim/types';
@@ -16,6 +16,18 @@ function seedOf(r: ReturnType<typeof applyCommand>): number {
 
 function atHall(state: VillageState, hall: number): VillageState {
   return { ...state, buildings: state.buildings.map((b) => (b.type === 'elder_toadstool' ? { ...b, level: hall } : b)) };
+}
+
+/** A village at `hall` with every Army Camp, the Barracks and troop research at that hall's caps. */
+function builtUp(state: VillageState, hall: number): VillageState {
+  const s = atHall(state, hall);
+  const lim = data.hall.levels[hall - 1].limits;
+  const extra = [
+    ...Array.from({ length: lim.army_camp.count }, (_, i) => ({ id: `camp${i}`, type: 'army_camp', level: lim.army_camp.maxLevel, x: 2 + i * 4, y: 2, upgrade: null, collector: null })),
+    { id: 'barracks', type: 'burrow_barracks', level: lim.burrow_barracks.maxLevel, x: 2, y: 6, upgrade: null, collector: null },
+  ];
+  const cap = data.hall.levels[hall - 1].troopLevelCap;
+  return { ...s, buildings: [...s.buildings, ...extra], research: { levels: Object.fromEntries(Object.keys(data.troops).map((t) => [t, Math.min(cap, data.troops[t].levels.length)])), active: null } };
 }
 
 const avgLoot = (hall: number) => {
@@ -64,7 +76,7 @@ describe('scouting (#1, #2)', () => {
 describe('matchmaking by trophies (#3)', () => {
   it('more trophies bring stronger opponents with more loot', () => {
     const { state } = newGame();
-    const s = atHall(state, 6);
+    const s = builtUp(state, 5);
     const avg = (trophies: number) => {
       let hall = 0;
       let loot = 0;
@@ -79,22 +91,25 @@ describe('matchmaking by trophies (#3)', () => {
       }
       return { hall: hall / 20, loot: loot / 20, lvl: lvl / 20 };
     };
-    const low = avg(1500);
+    // A hall 5 village: low trophies meet fresh hall 5 bases, high trophies meet built-up ones and some hall 6.
+    const low = avg(0);
+    const mid = avg(1500);
     const high = avg(2050);
-    expect(high.hall).toBeGreaterThan(low.hall);
-    expect(high.loot).toBeGreaterThan(low.loot);
-    const top = avg(2050);
-    const midHall6 = avg(1900);
-    expect(top.lvl).toBeGreaterThan(midHall6.lvl - 0.01);
+    expect(low.hall).toBe(5);
+    expect(high.hall).toBeGreaterThan(mid.hall);
+    expect(mid.lvl).toBeGreaterThan(low.lvl);
+    expect(mid.loot).toBeGreaterThan(low.loot);
+    expect(high.loot).toBeGreaterThan(mid.loot);
   });
 
-  it('opponents stay within one hall below and one above, and their trophies follow their strength', () => {
+  it('opponents stay within the allowed hall range, and their trophies follow their strength', () => {
     const { state } = newGame();
     for (const hall of [1, 3, 6]) {
       for (const trophies of [0, 500, 1200, 3000]) {
         for (let i = 0; i < 15; i++) {
           const m = matchStrength(createRng(i * 31 + trophies), trophies, hall, data);
-          expect(m.hall).toBeGreaterThanOrEqual(Math.max(1, hall - 1));
+          // Never below your own hall: trophies that lag behind your hall just mean fresher bases.
+          expect(m.hall).toBeGreaterThanOrEqual(Math.max(1, hall - Math.ceil(data.ranks.matchmaking.hallsBelow)));
           expect(m.hall).toBeLessThanOrEqual(Math.min(6, hall + 1));
           const s = m.hall - 1 + m.bias;
           expect(Math.abs(m.trophies - s * data.ranks.matchmaking.trophiesPerHall)).toBeLessThanOrEqual(data.ranks.matchmaking.trophyJitter + 1);
@@ -104,17 +119,23 @@ describe('matchmaking by trophies (#3)', () => {
     void state;
   });
 
-  it('beating a lower Elder Toadstool pays less loot', () => {
+  it('opponents follow army strength: a built-up village meets its own hall, one still building up meets weaker bases', () => {
     const { state } = newGame();
-    // At these trophies both a hall 2 and a hall 3 player meet the same hall 2 base.
-    const trophies = Math.round(1.4 * data.ranks.matchmaking.trophiesPerHall);
-    for (const seed of [4242, 99, 1234]) {
-      const full = opponentFor(seed, { ...atHall(state, 2), trophies }, data);
-      const penalised = opponentFor(seed, { ...atHall(state, 3), trophies }, data);
-      expect(full.hallLevel).toBe(2);
-      expect(penalised.buildings.map((b) => [b.type, b.level, b.x, b.y])).toEqual(full.buildings.map((b) => [b.type, b.level, b.x, b.y]));
-      expect(totalLoot(penalised).acorns!).toBeLessThan(totalLoot(full).acorns!);
+    for (const hall of [3, 4, 6]) {
+      const ready = { ...builtUp(state, hall), trophies: 0 };
+      expect(readiness(ready, data)).toBeGreaterThan(0.95);
+      const fresh = { ...atHall(state, hall), trophies: 0 };
+      expect(readiness(fresh, data)).toBe(0);
+      for (let seed = 1; seed <= 10; seed++) {
+        expect(opponentFor(seed * 31, ready, data).hallLevel).toBeGreaterThanOrEqual(hall);
+        expect(opponentFor(seed * 31, fresh, data).hallLevel).toBeLessThan(hall);
+        expect(opponentFor(seed * 31, fresh, data).hallLevel).toBeGreaterThanOrEqual(hall - Math.ceil(data.ranks.matchmaking.hallsBelow));
+      }
     }
+    // The penalty still exists for higher-hall attackers (bot raiders one hall above you).
+    const base = opponentFor(5, { ...atHall(state, 2), trophies: 0 }, data);
+    const cut = applyLootPenalty(structuredClone(base), 3, data);
+    expect(totalLoot(cut).acorns!).toBeLessThan(totalLoot(base).acorns!);
   });
 
   it('higher leagues add a bonus to won attacks', () => {

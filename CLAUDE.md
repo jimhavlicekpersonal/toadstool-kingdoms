@@ -25,7 +25,7 @@ How this is met:
 ## Decisions made during Phases 2-6
 
 - Art direction (owner request): smoother, softer, Nintendo-like look. All art is still generated in code (`src/render/art/`).
-- Save format is versioned (`src/sim/save.ts`, currently v8) with a migration step per version. Bump `SAVE_VERSION` and add a step for every state change. (v7 dropped stored replays because troop and defense numbers changed; v8 added the daily chest and streak.)
+- Save format is versioned (`src/sim/save.ts`, currently v9) with a migration step per version. Bump `SAVE_VERSION` and add a step for every state change. (v7 and v9 dropped stored replays because battle rules changed; v8 added the daily chest and streak.)
 - Progression pacing is checked by a model-player test (`tests/balance/`) that fights every raid as a real battle through matchmaking and `battleEnd` (no assumed loot share). Rerun it after changing costs, times, loot or combat numbers. `tests/balance/combat.test.ts` and `curves.test.ts` pin the attack/defense balance and the curve shapes.
 - Offers have a `minAccountHours` field so brand-new players are not shown the builder offer in their first minutes.
 - Real prices appear only in the Store and its confirm step (pass and offer popups link to the Store).
@@ -41,7 +41,7 @@ A review against how this genre is usually balanced found 20 game-theory holes a
 |---|---|---|---|
 | 1 | Home + Attack rerolled opponents for free | The scouted opponent is kept (`state.scout`) until it is attacked or Next is paid | `tests/sim/matchmaking.test.ts` |
 | 2 | Next fee shrank to <1% of loot | `scoutFeeByHall` is ~3% of a hall's average loot | same |
-| 3 | Trophies didn't affect opponents | `src/sim/matchmaking.ts`: strength = trophies / `trophiesPerHall`; it sets the opponent's hall, building levels and loot, kept within 1 hall below / 1 above | same |
+| 3 | Trophies didn't affect opponents | `src/sim/matchmaking.ts`: strength = trophies / `trophiesPerHall`; it sets the opponent's hall, building levels and loot. Since the level rebuild, a floor from the player's army strength also applies (see below) | same |
 | 4 | Trophies only went up | Opponents' trophies follow their strength, so running ahead of your hall makes wins pay less and losses cost more; win 24 / loss 20 at parity | same |
 | 5 | Attacks ~100% / 3★ at every hall | Defense damage ×4.5, defense HP ×3, other buildings and hedges ×1.5; full army at matched strength now does ~55-75% | `tests/balance/combat.test.ts` |
 | 6 | Balance test assumed 55% loot | Model player fights real battles | `tests/balance/progression.test.ts` |
@@ -53,7 +53,7 @@ A review against how this genre is usually balanced found 20 game-theory holes a
 | 12 | Raid profit per Dew grew 1.3x → 9.6x | Troop training cost rises with level; ratio stays ~2-4.5x | `curves.test.ts` |
 | 13 | Troops had no levels | Troop research in the Burrow Barracks (`src/sim/research.ts`), capped by `troopLevelCap` in hall.json | `research.test.ts` |
 | 14 | Hall timer jumped 36x at hall 4 | Hall times grow ~2.7x per level (hall 10 would be ~7 days) | `curves.test.ts` |
-| 15 | Hall cost multipliers shrank | 1k → 4k → 20k → 130k → 850k (x4, 5, 6.5, 6.5); the hall stores little | same |
+| 15 | Hall cost multipliers shrank | 1k → 4k → 20k → 100k → 750k (x4, 5, 5, 7.5); the hall stores little | same |
 | 16 | Collector payback went up and down | Paybacks rise every level and stay under a week | same |
 | 17 | No cap on loot from storage; no penalty for hitting lower halls | `storageLootCapByHall`; `lootPenaltyByHallDiff` (client, bots and server) | `raids.test.ts`, `matchmaking.test.ts` |
 | 18 | Shield always 12 h | 12/14/16 h at 30/60/90% (`shieldTiers`) | `raids.test.ts` |
@@ -72,6 +72,19 @@ Built to bring players back for good reasons, within App Store rules, FTC guidan
 - **Notifications** (`planNotifications` in `src/sim/reminders.ts`, `src/data/notifications.json`): off until the player turns them on; each type can be switched off; none in quiet hours (they wait until morning); at most `maxPerDay` per local day.
 - **Close calls** (`src/sim/battle/closecall.ts`): "so close" notes after an attack, read from the finished battle and shown only when true. No rigged or faked near-misses, and no "almost" animations on random rewards: a chest only shows what it gave.
 - The model player opens the chest daily and plays through events, so pacing (`tests/balance/progression.test.ts`) includes this income.
+
+## Guardian animals and the level rebuild
+
+- **Guardian animals** (`src/data/guardians.json`, `guardian_burrow` in buildings.json): Badger Warden, Stoat Skirmisher and Hawk Sentinel come out of a base's Guardian Burrow when raiders get close (all at once if it falls), chase raiders near the burrow and walk back. In the battle sim they are units with `side: 'guard'` in `sim.troops`. Defenses, traps and splash only hit attackers. Attacking troops fight guardians in reach, except troops that go for defenses (Beetle Brutes, Owl Bombers), and only ranged troops can hit hawks. Their strength follows `strengthShareByHall` (share of a matched army's strength), checked by `tests/battle/guardians.test.ts`.
+- **Levels in order of difficulty** (`docs/DIFFICULTY.md`): a 100-player simulation found levels 3–4 harder than 5–6, hedges that didn't wall anything, troops landing inside bases, and everyone fighting a level below. The rebuild:
+  - **Drop zone:** troops land only on open ground reachable from the map edge.
+  - **Base layout:** generated bases place their core first, then a closed hedge ring (`baseLayoutByHall`: gaps, inner ring), then collectors and huts outside it.
+  - **Troop research:** a sixth troop level, so the research cap rises at every level.
+  - **Defenses:** per-level counts and levels retuned; building HP grows with the level that unlocks it.
+  - **Matchmaking:** opponents now have a floor at the level the player's army actually matches (`powerStrength`, up to `hallsBelow` levels down), and trophies push them up from there.
+  - **Guardians:** a steeper strength curve.
+  - `tests/balance/combat.test.ts` checks that each level is harder than the last.
+- **Playthrough simulator** (`tools/playthroughs/`, `npm run sim:playthroughs -- 100 <label>`): 100 varied model players, per-level battle/time/raid/frustration metrics, base geometry, and a `compare` mode. Bundled with Vite like the server; results go to `sim-results/` (git-ignored). Rerun it after changing levels or combat numbers.
 
 ## Stack decisions made during Phase 1
 

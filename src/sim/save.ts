@@ -11,7 +11,7 @@ import { emptyResearch } from './research';
 import { emptyDaily } from './daily';
 import type { GameData as GD } from './types';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 const EXPORT_PREFIX = 'TK1';
 
 export interface SaveFile {
@@ -90,6 +90,14 @@ export function migrate(raw: unknown, data?: GD): SaveFile {
   if (out.version < 8 && v && typeof v === 'object') {
     // v7 -> v8: free daily chest and visit streak.
     v.daily = v.daily ?? (data ? emptyDaily(data) : { lastDay: -1, step: 0, skipsLeft: 1, skipWeek: -1, history: [] });
+  }
+  if (out.version < 9 && v && typeof v === 'object') {
+    // v8 -> v9: guardian animals, the drop zone outside hedge rings and the
+    // rebuilt levels change how battles play, so old replays would not play
+    // back the same way: drop them. The kept scout opponent is re-rolled too.
+    v.battleLog = [];
+    v.defenseLog = [];
+    v.scout = null;
   }
   out.version = SAVE_VERSION;
   return out;

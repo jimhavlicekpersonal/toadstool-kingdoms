@@ -20,10 +20,11 @@
  * - Between sessions, real offline bot raids run against the real layout.
  */
 import { armyHousing, barracksLevel, housingCapacity, queueHousing } from '../../src/sim/army';
-import { createBattle } from '../../src/sim/battle/battle';
+import { createBattle, runBattle, type BattleSim } from '../../src/sim/battle/battle';
+import type { BaseLayout, Deployment } from '../../src/sim/battle/types';
 import { totalLoot } from '../../src/sim/battle/basegen';
 import { FakeClock } from '../../src/sim/clock';
-import { buildingDef, levelDef } from '../../src/sim/data';
+import { buildingDef, levelDef, troopLevel } from '../../src/sim/data';
 import { botDeployments } from '../../src/sim/defense';
 import { findFreeSpot } from '../../src/sim/grid';
 import { opponentFor } from '../../src/sim/matchmaking';
@@ -39,6 +40,18 @@ export interface ModelOptions {
   raidsPerSession: number;
   /** Max paid "Next" presses per raid. */
   maxNext?: number;
+  /** When the village is created (changes its seed); default 2026-01-05 08:00 UTC. */
+  startAt?: number;
+  /** Housing shares to train toward instead of the bot mix (unlocked troops only). */
+  armyMix?: Record<string, number>;
+  /** How troops are deployed (default: the bot plan, everything from one side). */
+  deployPlan?: (deployable: Uint8Array, size: number, army: Record<string, number>, seed: number, data: GameData, levels: Record<string, number>) => Deployment[];
+  /** Build defenses before collectors and extra storage. */
+  defenseFirst?: boolean;
+  /** Called after each raid with the finished battle (for analysis tools). */
+  onRaid?: (info: { hall: number; base: BaseLayout; sim: BattleSim; loot: number; trophies: number; armyCost: number; at: number }) => void;
+  /** Called at the end of each session (for analysis tools). */
+  onSession?: (info: { hall: number; at: number; actions: number; buildersIdle: number; storageFull: boolean; raided: boolean }) => void;
 }
 
 export interface RaidLog {
@@ -51,7 +64,7 @@ export interface RaidLog {
 }
 
 export class ModelPlayer {
-  clock = new FakeClock(Date.UTC(2026, 0, 5, 8, 0, 0));
+  clock: FakeClock;
   state: VillageState;
   hallReachedAt: Record<number, number> = {};
   raids = 0;
@@ -60,6 +73,7 @@ export class ModelPlayer {
   private readonly t0: number;
 
   constructor(private readonly data: GameData, private readonly opts: ModelOptions) {
+    this.clock = new FakeClock(opts.startAt ?? Date.UTC(2026, 0, 5, 8, 0, 0));
     this.state = createNewVillage(this.clock.now(), data);
     this.t0 = this.clock.now();
     this.hallReachedAt[1] = 0;
@@ -69,9 +83,15 @@ export class ModelPlayer {
     return (this.clock.now() - this.t0) / 3_600_000;
   }
 
+  /** Commands that moved the village forward this session (builds, upgrades, research). */
+  private actions = 0;
+
   private run(cmd: Command): boolean {
     const r = applyCommand(this.state, cmd, this.clock.now(), this.data);
-    if (r.ok) this.state = r.state;
+    if (r.ok) {
+      this.state = r.state;
+      if (cmd.type === 'place' || cmd.type === 'upgrade' || cmd.type === 'research') this.actions++;
+    }
     return r.ok;
   }
 
@@ -103,6 +123,8 @@ export class ModelPlayer {
     const d = this.data;
     this.state = advance(this.state, this.clock.now(), d).state;
     this.noteHall();
+    this.actions = 0;
+    const raidsBefore = this.raids;
     for (const b of this.state.buildings) if (d.buildings[b.type].produces) this.run({ type: 'collect', id: b.id });
     // The free daily chest (fails harmlessly once today's is open).
     this.run({ type: 'openDailyChest' });
@@ -112,6 +134,18 @@ export class ModelPlayer {
     this.spend();
     this.train();
     this.state.lastSeenAt = this.clock.now();
+    if (this.opts.onSession) {
+      const cap = capacity(this.state, d);
+      const bs = builderStatus(this.state, d, this.clock.now());
+      this.opts.onSession({
+        hall: hallLevel(this.state, d),
+        at: this.clock.now(),
+        actions: this.actions,
+        buildersIdle: bs.free,
+        storageFull: this.state.resources.acorns >= cap.acorns || this.state.resources.dew >= cap.dew,
+        raided: this.raids > raidsBefore,
+      });
+    }
   }
 
   private hallCost(): Record<string, number> {
@@ -159,12 +193,12 @@ export class ModelPlayer {
       for (const t of ['acorn_silo', 'dew_cistern']) consider(t, storageShort ? 0 : 3);
       for (const t of ['army_camp', 'burrow_barracks']) consider(t, 1);
       for (const t of ['acorn_orchard', 'dewdrop_well']) consider(t, 2);
-      for (const t of ['acorn_cannon', 'wasp_nest', 'pinecone_catapult', 'firefly_tower', 'thorn_snare', 'sap_puddle']) consider(t, 4);
+      for (const t of ['acorn_cannon', 'wasp_nest', 'pinecone_catapult', 'firefly_tower', 'guardian_burrow', 'thorn_snare', 'sap_puddle']) consider(t, this.opts.defenseFirst ? 1.5 : 4);
       options.sort((a, b) => a.prio - b.prio);
       let did = false;
       for (const o of options) {
         // Extras (army, defenses) only if they leave enough saved for the next Elder Toadstool.
-        if (o.prio >= 3) {
+        if (o.prio >= 3 || (this.opts.defenseFirst && o.prio === 1.5)) {
           const c = costOf(o.cmd);
           if (Object.entries(c).some(([k, v]) => res[k] - v < (need[k] ?? 0) * 0.5)) continue;
         }
@@ -181,9 +215,10 @@ export class ModelPlayer {
     const d = this.data;
     const bl = barracksLevel(this.state, d);
     const mixes = d.raids.botArmyMix;
-    const want = mixes[Math.min(mixes.length, hallLevel(this.state, d)) - 1];
+    const want = this.opts.armyMix ?? mixes[Math.min(mixes.length, hallLevel(this.state, d)) - 1];
     const ok = Object.entries(want).filter(([t]) => d.troops[t].barracksLevel <= bl);
     const sum = ok.reduce((a, [, v]) => a + v, 0);
+    if (!ok.length || sum <= 0) return [['hedgehog_roller', 1]];
     return ok.map(([t, v]) => [t, v / sum]);
   }
 
@@ -249,13 +284,18 @@ export class ModelPlayer {
       const levels = troopLevels(this.state, d);
       const setup = { seed: mixSeed(seed, 0xba771e), base, army, levels };
       const probe = createBattle(setup, d);
-      const deployments = botDeployments(probe.deployable, probe.grid.size, army, createRng(seed), d, levels);
+      const deployments = this.opts.deployPlan
+        ? this.opts.deployPlan(probe.deployable, probe.grid.size, army, seed, d, levels)
+        : botDeployments(probe.deployable, probe.grid.size, army, createRng(seed), d, levels);
       const before = this.state.resources.acorns + this.state.resources.dew;
+      const armyCost = Object.entries(army).reduce((sum, [t, n]) => sum + n * (troopLevel(d, t, levels[t] ?? 1).cost.dew ?? 0), 0);
       const res = applyCommand(this.state, { type: 'battleEnd', record: { at: this.clock.now(), opponentName: base.name, setup, deployments } }, this.clock.now(), d);
       if (!res.ok) throw new Error(`battleEnd failed: ${res.message}`);
       this.state = res.state;
       const rec = this.state.battleLog[this.state.battleLog.length - 1];
-      this.raidLog.push({ hall: hl, opponentHall: base.hallLevel, stars: rec.result.stars, destruction: rec.result.destruction, loot: this.state.resources.acorns + this.state.resources.dew - before, trophies: this.state.trophies });
+      const loot = this.state.resources.acorns + this.state.resources.dew - before;
+      this.raidLog.push({ hall: hl, opponentHall: base.hallLevel, stars: rec.result.stars, destruction: rec.result.destruction, loot, trophies: this.state.trophies });
+      if (this.opts.onRaid) this.opts.onRaid({ hall: hl, base, sim: runBattle(setup, deployments, d).sim, loot, trophies: this.state.trophies, armyCost, at: this.clock.now() });
       // Replays are not needed here, and cloning them on every command is slow.
       this.state.battleLog = [];
       this.raids++;
@@ -285,8 +325,7 @@ export function activeHour(p: ModelPlayer, minutes = 60, stepMin = 2): void {
 }
 
 /** Normal play: 4 sessions a day (8:00, 12:30, 18:00, 22:00 UTC here), the game closed in between. */
-export function normalDays(p: ModelPlayer, days: number, onDay?: (day: number) => void): void {
-  const sessionsAt = [8 * 60, 12.5 * 60, 18 * 60, 22 * 60];
+export function normalDays(p: ModelPlayer, days: number, onDay?: (day: number) => void, sessionsAt = [8 * 60, 12.5 * 60, 18 * 60, 22 * 60]): void {
   const dayStart = (t: number) => Math.floor(t / 86_400_000) * 86_400_000;
   for (let day = 0; day < days; day++) {
     const base = dayStart(p.clock.now()) + (day === 0 ? 0 : 0);

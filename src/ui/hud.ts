@@ -443,6 +443,9 @@ export class Hud {
       stats.append(h('span', { class: 'chip' }, def.combat.targets === 'both' ? 'Ground & air' : def.combat.targets === 'air' ? 'Air only' : 'Ground only'));
     }
     if (def.category === 'hedge' && ld) stats.append(h('span', { class: 'chip' }, `${formatNumber(ld.hp)} HP`));
+    if (ld?.guardians) {
+      for (const [g, v] of Object.entries(ld.guardians)) stats.append(h('span', { class: 'chip' }, `${v.count}× ${gd.guardians.animals[g]?.name ?? g} Lv ${v.level}`));
+    }
     if (stats.childElementCount) this.sheet.append(stats);
 
     // Upgrade in progress
@@ -594,7 +597,7 @@ export class Hud {
     const tabs: [typeof this.shopTab, string, string[]][] = [
       ['resources', 'Resources', ['collector', 'storage', 'builder']],
       ['army', 'Army', ['military']],
-      ['defense', 'Defense', ['defense', 'hedge', 'trap']],
+      ['defense', 'Defense', ['defense', 'guardian', 'hedge', 'trap']],
       ['decor', 'Decor', ['decor']],
     ];
     const visible = tabs.filter(([, , cats]) => Object.values(this.c.data.buildings).some((d) => d.inShop && cats.includes(d.category)));

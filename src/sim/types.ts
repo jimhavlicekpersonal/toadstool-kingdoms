@@ -7,7 +7,7 @@ export type Resources = Record<ResourceKind, number>;
 export type Cost = Partial<Record<ResourceKind, number>>;
 
 export type BuildingType = string;
-export type BuildingCategory = 'hall' | 'collector' | 'storage' | 'builder' | 'military' | 'defense' | 'hedge' | 'trap' | 'decor' | 'obstacle' | 'social';
+export type BuildingCategory = 'hall' | 'collector' | 'storage' | 'builder' | 'military' | 'defense' | 'hedge' | 'trap' | 'decor' | 'obstacle' | 'social' | 'guardian';
 
 export interface UpgradeTimer {
   /** Level the building will have when the timer ends. */
@@ -195,6 +195,8 @@ export interface LevelDef {
   damage?: number;
   /** Grove Lodge: housing space for donated troops. */
   reinforcement?: number;
+  /** Guardian Burrow: the guardian animals that rush out during a raid. */
+  guardians?: Record<string, { count: number; level: number }>;
 }
 
 export type TargetLayer = 'ground' | 'air' | 'both';
@@ -250,6 +252,8 @@ export interface BattleDef {
   lootShares: { storage: number; collector: number; hall: number };
   catapultSpread: number;
   deploySpread: number;
+  /** Generated base layout by hall level: 2-tile gaps in the hedge ring, and an inner ring around the Elder Toadstool. */
+  baseLayoutByHall?: { hedgeGaps: number; innerRing: boolean }[];
   /** When an attack counts as a close call (shown after the battle, only if true). */
   closeCall: { starMargin: number; hallHpFraction: number; buildingsLeft: number; perfectMinDestruction: number };
 }
@@ -341,11 +345,17 @@ export interface RanksDef {
     trophiesPerHall: number;
     /** Random spread of an opponent's strength around yours (hall levels). */
     strengthJitter: number;
-    /** Opponents are kept within these many hall levels below / above yours. */
+    /** Opponents are kept within these many hall levels below / above yours (can be fractional, in strength units). */
     hallsBelow: number;
     hallsAbove: number;
     /** Random spread of an opponent's trophies around its strength. */
     trophyJitter: number;
+    /**
+     * Opponents are never weaker than the player's development: the floor
+     * rises from `hallsBelow` levels down (army not built up yet) to the
+     * player's own level as their Army Camps and research catch up.
+     */
+    readinessFloor?: boolean;
   };
   /** Loot multiplier when the target's Elder Toadstool is lower than the attacker's (index = difference). */
   lootPenaltyByHallDiff: number[];
@@ -516,6 +526,34 @@ export interface NotificationsDef {
   types: { id: string; label: string; default: boolean }[];
 }
 
+export interface GuardianDef {
+  name: string;
+  description: string;
+  air: boolean;
+  /** Which attacking troops it can hit. */
+  targets: TargetLayer;
+  range: number;
+  speed: number;
+  attackIntervalTicks: number;
+  projectile?: string;
+  projectileSpeed?: number;
+  levels: { level: number; hp: number; damage: number }[];
+}
+
+export interface GuardiansDef {
+  /** Guardians come out when an attacking troop gets this close to the burrow (tiles). */
+  triggerRange: number;
+  /** They chase attackers only this far from the burrow, then walk back. */
+  leashRange: number;
+  /** One guardian comes out every this many ticks. */
+  releaseIntervalTicks: number;
+  /** Attacking troops that can hit a guardian fight it when it is this much beyond their range. */
+  engageRange: number;
+  /** Target guardian strength at each hall's burrow cap, as a share of a full matched army's strength. */
+  strengthShareByHall: number[];
+  animals: Record<string, GuardianDef>;
+}
+
 export interface GameData {
   buildings: Record<BuildingType, BuildingDef>;
   hall: { levels: HallLevelDef[] };
@@ -534,4 +572,5 @@ export interface GameData {
   daily: DailyDef;
   events: EventsDef;
   notifications: NotificationsDef;
+  guardians: GuardiansDef;
 }

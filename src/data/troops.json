@@ -29,7 +29,7 @@
         },
         "research": {
           "cost": {
-            "dew": 4000
+            "dew": 3000
           },
           "seconds": 1800
         }
@@ -43,9 +43,9 @@
         },
         "research": {
           "cost": {
-            "dew": 18000
+            "dew": 12000
           },
-          "seconds": 7200
+          "seconds": 5400
         }
       },
       {
@@ -57,9 +57,9 @@
         },
         "research": {
           "cost": {
-            "dew": 60000
+            "dew": 40000
           },
-          "seconds": 21600
+          "seconds": 14400
         }
       },
       {
@@ -71,9 +71,23 @@
         },
         "research": {
           "cost": {
-            "dew": 150000
+            "dew": 120000
           },
-          "seconds": 43200
+          "seconds": 36000
+        }
+      },
+      {
+        "level": 6,
+        "hp": 105,
+        "damage": 15,
+        "cost": {
+          "dew": 75
+        },
+        "research": {
+          "cost": {
+            "dew": 250000
+          },
+          "seconds": 72000
         }
       }
     ]
@@ -110,7 +124,7 @@
         },
         "research": {
           "cost": {
-            "dew": 5000
+            "dew": 3500
           },
           "seconds": 1800
         }
@@ -124,9 +138,9 @@
         },
         "research": {
           "cost": {
-            "dew": 21500
+            "dew": 14500
           },
-          "seconds": 7200
+          "seconds": 5400
         }
       },
       {
@@ -138,9 +152,9 @@
         },
         "research": {
           "cost": {
-            "dew": 72000
+            "dew": 48000
           },
-          "seconds": 21600
+          "seconds": 14400
         }
       },
       {
@@ -152,9 +166,23 @@
         },
         "research": {
           "cost": {
-            "dew": 180000
+            "dew": 144000
           },
-          "seconds": 43200
+          "seconds": 36000
+        }
+      },
+      {
+        "level": 6,
+        "hp": 50,
+        "damage": 21,
+        "cost": {
+          "dew": 185
+        },
+        "research": {
+          "cost": {
+            "dew": 300000
+          },
+          "seconds": 72000
         }
       }
     ]
@@ -189,7 +217,7 @@
         },
         "research": {
           "cost": {
-            "dew": 6000
+            "dew": 4500
           },
           "seconds": 1800
         }
@@ -203,9 +231,9 @@
         },
         "research": {
           "cost": {
-            "dew": 27000
+            "dew": 18000
           },
-          "seconds": 7200
+          "seconds": 5400
         }
       },
       {
@@ -217,9 +245,9 @@
         },
         "research": {
           "cost": {
-            "dew": 90000
+            "dew": 60000
           },
-          "seconds": 21600
+          "seconds": 14400
         }
       },
       {
@@ -231,9 +259,23 @@
         },
         "research": {
           "cost": {
-            "dew": 225000
+            "dew": 180000
           },
-          "seconds": 43200
+          "seconds": 36000
+        }
+      },
+      {
+        "level": 6,
+        "hp": 1365,
+        "damage": 42,
+        "cost": {
+          "dew": 930
+        },
+        "research": {
+          "cost": {
+            "dew": 375000
+          },
+          "seconds": 72000
         }
       }
     ]
@@ -270,7 +312,7 @@
         },
         "research": {
           "cost": {
-            "dew": 7000
+            "dew": 5500
           },
           "seconds": 1800
         }
@@ -284,9 +326,9 @@
         },
         "research": {
           "cost": {
-            "dew": 32500
+            "dew": 21500
           },
-          "seconds": 7200
+          "seconds": 5400
         }
       },
       {
@@ -298,9 +340,9 @@
         },
         "research": {
           "cost": {
-            "dew": 108000
+            "dew": 72000
           },
-          "seconds": 21600
+          "seconds": 14400
         }
       },
       {
@@ -312,9 +354,23 @@
         },
         "research": {
           "cost": {
-            "dew": 270000
+            "dew": 216000
           },
-          "seconds": 43200
+          "seconds": 36000
+        }
+      },
+      {
+        "level": 6,
+        "hp": 315,
+        "damage": 105,
+        "cost": {
+          "dew": 1485
+        },
+        "research": {
+          "cost": {
+            "dew": 450000
+          },
+          "seconds": 72000
         }
       }
     ]
@@ -349,7 +405,7 @@
         },
         "research": {
           "cost": {
-            "dew": 6500
+            "dew": 5000
           },
           "seconds": 1800
         }
@@ -363,9 +419,9 @@
         },
         "research": {
           "cost": {
-            "dew": 29000
+            "dew": 19000
           },
-          "seconds": 7200
+          "seconds": 5400
         }
       },
       {
@@ -377,9 +433,9 @@
         },
         "research": {
           "cost": {
-            "dew": 96000
+            "dew": 64000
           },
-          "seconds": 21600
+          "seconds": 14400
         }
       },
       {
@@ -391,9 +447,23 @@
         },
         "research": {
           "cost": {
-            "dew": 240000
+            "dew": 192000
           },
-          "seconds": 43200
+          "seconds": 36000
+        }
+      },
+      {
+        "level": 6,
+        "hp": 210,
+        "damage": 34,
+        "cost": {
+          "dew": 445
+        },
+        "research": {
+          "cost": {
+            "dew": 400000
+          },
+          "seconds": 72000
         }
       }
     ]

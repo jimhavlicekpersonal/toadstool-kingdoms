@@ -46,7 +46,7 @@
           "acorns": 20000
         },
         "buildSeconds": 1620,
-        "hp": 3150,
+        "hp": 3340,
         "storage": {
           "acorns": 6000,
           "dew": 6000
@@ -55,10 +55,10 @@
       {
         "level": 5,
         "cost": {
-          "acorns": 130000
+          "acorns": 100000
         },
         "buildSeconds": 4320,
-        "hp": 3600,
+        "hp": 4310,
         "storage": {
           "acorns": 8000,
           "dew": 8000
@@ -67,10 +67,10 @@
       {
         "level": 6,
         "cost": {
-          "acorns": 850000
+          "acorns": 750000
         },
         "buildSeconds": 11700,
-        "hp": 4200,
+        "hp": 5950,
         "storage": {
           "acorns": 10000,
           "dew": 10000
@@ -146,7 +146,7 @@
           "dew": 14000
         },
         "buildSeconds": 1200,
-        "hp": 960,
+        "hp": 1020,
         "ratePerHour": 1700
       },
       {
@@ -155,7 +155,7 @@
           "dew": 28000
         },
         "buildSeconds": 2700,
-        "hp": 1000,
+        "hp": 1060,
         "ratePerHour": 2200
       },
       {
@@ -164,7 +164,7 @@
           "dew": 56000
         },
         "buildSeconds": 6000,
-        "hp": 1100,
+        "hp": 1310,
         "ratePerHour": 2800
       },
       {
@@ -173,7 +173,7 @@
           "dew": 84000
         },
         "buildSeconds": 13200,
-        "hp": 1150,
+        "hp": 1370,
         "ratePerHour": 3500
       },
       {
@@ -182,7 +182,7 @@
           "dew": 120000
         },
         "buildSeconds": 28800,
-        "hp": 1300,
+        "hp": 1840,
         "ratePerHour": 4300
       }
     ]
@@ -255,7 +255,7 @@
           "acorns": 14000
         },
         "buildSeconds": 1200,
-        "hp": 960,
+        "hp": 1020,
         "ratePerHour": 1700
       },
       {
@@ -264,7 +264,7 @@
           "acorns": 28000
         },
         "buildSeconds": 2700,
-        "hp": 1000,
+        "hp": 1060,
         "ratePerHour": 2200
       },
       {
@@ -273,7 +273,7 @@
           "acorns": 56000
         },
         "buildSeconds": 6000,
-        "hp": 1100,
+        "hp": 1310,
         "ratePerHour": 2800
       },
       {
@@ -282,7 +282,7 @@
           "acorns": 84000
         },
         "buildSeconds": 13200,
-        "hp": 1150,
+        "hp": 1370,
         "ratePerHour": 3500
       },
       {
@@ -291,7 +291,7 @@
           "acorns": 120000
         },
         "buildSeconds": 28800,
-        "hp": 1300,
+        "hp": 1840,
         "ratePerHour": 4300
       }
     ]
@@ -375,7 +375,7 @@
           "dew": 25000
         },
         "buildSeconds": 1200,
-        "hp": 2400,
+        "hp": 2540,
         "storage": {
           "acorns": 100000
         }
@@ -386,7 +386,7 @@
           "dew": 50000
         },
         "buildSeconds": 2700,
-        "hp": 2550,
+        "hp": 2700,
         "storage": {
           "acorns": 225000
         }
@@ -397,7 +397,7 @@
           "dew": 100000
         },
         "buildSeconds": 6000,
-        "hp": 2700,
+        "hp": 3220,
         "storage": {
           "acorns": 450000
         }
@@ -408,7 +408,7 @@
           "dew": 250000
         },
         "buildSeconds": 13200,
-        "hp": 2850,
+        "hp": 4030,
         "storage": {
           "acorns": 850000
         }
@@ -494,7 +494,7 @@
           "acorns": 25000
         },
         "buildSeconds": 1200,
-        "hp": 2400,
+        "hp": 2540,
         "storage": {
           "dew": 100000
         }
@@ -505,7 +505,7 @@
           "acorns": 50000
         },
         "buildSeconds": 2700,
-        "hp": 2550,
+        "hp": 2700,
         "storage": {
           "dew": 225000
         }
@@ -516,7 +516,7 @@
           "acorns": 100000
         },
         "buildSeconds": 6000,
-        "hp": 2700,
+        "hp": 3220,
         "storage": {
           "dew": 450000
         }
@@ -527,7 +527,7 @@
           "acorns": 250000
         },
         "buildSeconds": 13200,
-        "hp": 2850,
+        "hp": 4030,
         "storage": {
           "dew": 850000
         }
@@ -594,7 +594,7 @@
           "dew": 12000
         },
         "buildSeconds": 240,
-        "hp": 630
+        "hp": 670
       },
       {
         "level": 6,
@@ -602,7 +602,7 @@
           "dew": 40000
         },
         "buildSeconds": 540,
-        "hp": 700
+        "hp": 830
       }
     ]
   },
@@ -646,7 +646,7 @@
           "dew": 15000
         },
         "buildSeconds": 240,
-        "hp": 460,
+        "hp": 490,
         "housing": 50
       },
       {
@@ -655,7 +655,7 @@
           "dew": 50000
         },
         "buildSeconds": 540,
-        "hp": 500,
+        "hp": 530,
         "housing": 60
       },
       {
@@ -664,7 +664,7 @@
           "dew": 120000
         },
         "buildSeconds": 1200,
-        "hp": 520,
+        "hp": 740,
         "housing": 70
       },
       {
@@ -673,7 +673,7 @@
           "dew": 250000
         },
         "buildSeconds": 2700,
-        "hp": 560,
+        "hp": 800,
         "housing": 80
       }
     ]
@@ -725,7 +725,7 @@
           "acorns": 16000
         },
         "buildSeconds": 240,
-        "hp": 1500,
+        "hp": 1590,
         "damage": 63
       },
       {
@@ -734,7 +734,7 @@
           "acorns": 50000
         },
         "buildSeconds": 540,
-        "hp": 1800,
+        "hp": 1910,
         "damage": 81
       },
       {
@@ -743,7 +743,7 @@
           "acorns": 100000
         },
         "buildSeconds": 1200,
-        "hp": 2100,
+        "hp": 2520,
         "damage": 99
       },
       {
@@ -752,8 +752,8 @@
           "acorns": 200000
         },
         "buildSeconds": 2700,
-        "hp": 2450,
-        "damage": 122
+        "hp": 3470,
+        "damage": 135
       }
     ]
   },
@@ -768,7 +768,7 @@
       "range": 10,
       "minRange": 3,
       "fireIntervalTicks": 50,
-      "splashRadius": 1.5,
+      "splashRadius": 1.3,
       "projectile": "pinecone",
       "projectileSpeed": 0.6
     },
@@ -780,7 +780,7 @@
         },
         "buildSeconds": 240,
         "hp": 1200,
-        "damage": 90
+        "damage": 50
       },
       {
         "level": 2,
@@ -788,8 +788,8 @@
           "acorns": 32000
         },
         "buildSeconds": 540,
-        "hp": 1350,
-        "damage": 112
+        "hp": 1430,
+        "damage": 75
       },
       {
         "level": 3,
@@ -797,8 +797,8 @@
           "acorns": 120000
         },
         "buildSeconds": 1200,
-        "hp": 1500,
-        "damage": 144
+        "hp": 1790,
+        "damage": 100
       },
       {
         "level": 4,
@@ -806,8 +806,8 @@
           "acorns": 300000
         },
         "buildSeconds": 2700,
-        "hp": 1650,
-        "damage": 180
+        "hp": 2330,
+        "damage": 125
       },
       {
         "level": 5,
@@ -815,8 +815,8 @@
           "acorns": 600000
         },
         "buildSeconds": 6000,
-        "hp": 1800,
-        "damage": 220
+        "hp": 2550,
+        "damage": 150
       }
     ]
   },
@@ -867,7 +867,7 @@
           "acorns": 45000
         },
         "buildSeconds": 540,
-        "hp": 1300,
+        "hp": 1380,
         "damage": 36
       },
       {
@@ -876,7 +876,7 @@
           "acorns": 110000
         },
         "buildSeconds": 1200,
-        "hp": 1450,
+        "hp": 1740,
         "damage": 45
       },
       {
@@ -885,8 +885,8 @@
           "acorns": 250000
         },
         "buildSeconds": 2700,
-        "hp": 1700,
-        "damage": 54
+        "hp": 2410,
+        "damage": 64
       }
     ]
   },
@@ -911,7 +911,7 @@
         },
         "buildSeconds": 540,
         "hp": 1500,
-        "damage": 180
+        "damage": 120
       },
       {
         "level": 2,
@@ -919,8 +919,8 @@
           "acorns": 90000
         },
         "buildSeconds": 1200,
-        "hp": 1750,
-        "damage": 250
+        "hp": 1860,
+        "damage": 190
       },
       {
         "level": 3,
@@ -928,8 +928,8 @@
           "acorns": 270000
         },
         "buildSeconds": 2700,
-        "hp": 2000,
-        "damage": 320
+        "hp": 2390,
+        "damage": 260
       },
       {
         "level": 4,
@@ -937,7 +937,7 @@
           "acorns": 540000
         },
         "buildSeconds": 6000,
-        "hp": 2300,
+        "hp": 3260,
         "damage": 400
       }
     ]
@@ -1008,7 +1008,7 @@
     "combat": {
       "targets": "ground",
       "range": 0.9,
-      "splashRadius": 1.6,
+      "splashRadius": 1.25,
       "fireIntervalTicks": 1,
       "projectile": "thorns",
       "projectileSpeed": 1
@@ -1021,7 +1021,7 @@
         },
         "buildSeconds": 110,
         "hp": 1,
-        "damage": 180
+        "damage": 115
       },
       {
         "level": 2,
@@ -1030,7 +1030,7 @@
         },
         "buildSeconds": 240,
         "hp": 1,
-        "damage": 250
+        "damage": 160
       },
       {
         "level": 3,
@@ -1039,7 +1039,7 @@
         },
         "buildSeconds": 540,
         "hp": 1,
-        "damage": 320
+        "damage": 210
       },
       {
         "level": 4,
@@ -1048,7 +1048,7 @@
         },
         "buildSeconds": 1200,
         "hp": 1,
-        "damage": 400
+        "damage": 260
       }
     ]
   },
@@ -1261,7 +1261,7 @@
           "acorns": 40000
         },
         "buildSeconds": 540,
-        "hp": 1200,
+        "hp": 1270,
         "reinforcement": 20
       },
       {
@@ -1270,7 +1270,7 @@
           "acorns": 120000
         },
         "buildSeconds": 1200,
-        "hp": 1350,
+        "hp": 1610,
         "reinforcement": 25
       },
       {
@@ -1279,8 +1279,111 @@
           "acorns": 300000
         },
         "buildSeconds": 2700,
-        "hp": 1500,
+        "hp": 2130,
         "reinforcement": 30
+      }
+    ]
+  },
+  "guardian_burrow": {
+    "name": "Guardian Burrow",
+    "description": "Home of the village's guardian animals. When raiders come close, they rush out to defend.",
+    "size": 3,
+    "category": "guardian",
+    "inShop": true,
+    "levels": [
+      {
+        "level": 1,
+        "cost": {
+          "acorns": 5000
+        },
+        "buildSeconds": 540,
+        "hp": 1500,
+        "guardians": {
+          "stoat_skirmisher": {
+            "count": 1,
+            "level": 3
+          }
+        }
+      },
+      {
+        "level": 2,
+        "cost": {
+          "acorns": 20000
+        },
+        "buildSeconds": 1200,
+        "hp": 1700,
+        "guardians": {
+          "badger_warden": {
+            "count": 1,
+            "level": 1
+          },
+          "stoat_skirmisher": {
+            "count": 2,
+            "level": 4
+          }
+        }
+      },
+      {
+        "level": 3,
+        "cost": {
+          "acorns": 60000
+        },
+        "buildSeconds": 2700,
+        "hp": 2070,
+        "guardians": {
+          "badger_warden": {
+            "count": 3,
+            "level": 2
+          },
+          "stoat_skirmisher": {
+            "count": 3,
+            "level": 5
+          }
+        }
+      },
+      {
+        "level": 4,
+        "cost": {
+          "acorns": 150000
+        },
+        "buildSeconds": 6000,
+        "hp": 2630,
+        "guardians": {
+          "badger_warden": {
+            "count": 5,
+            "level": 5
+          },
+          "stoat_skirmisher": {
+            "count": 3,
+            "level": 5
+          },
+          "hawk_sentinel": {
+            "count": 2,
+            "level": 3
+          }
+        }
+      },
+      {
+        "level": 5,
+        "cost": {
+          "acorns": 300000
+        },
+        "buildSeconds": 13200,
+        "hp": 3540,
+        "guardians": {
+          "badger_warden": {
+            "count": 5,
+            "level": 6
+          },
+          "stoat_skirmisher": {
+            "count": 5,
+            "level": 6
+          },
+          "hawk_sentinel": {
+            "count": 5,
+            "level": 6
+          }
+        }
       }
     ]
   }
